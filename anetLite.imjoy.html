@@ -245,9 +245,17 @@ class ImJoyPlugin():
             self.model.load_weights(opt.load_from)
         else:
             model_path = os.path.join(opt.checkpoints_dir, '__model__.hdf5')
-            if os.path.exists(model_path):
-                print('loading weights from: ' + model_path)
-                self.model.load_weights(model_path)
+            model_config_path = os.path.join(opt.work_dir, 'model_config.json')
+            if os.path.exists(model_path) and os.path.exists(model_config_path):
+                with open(model_config_path) as f:
+                    model_config = json.load(f)
+
+                if model_config['input_size'] == opt.input_size \
+                        and model_config['input_channels'] == len(opt.input_channels) \
+                        and model_config['target_channels'] == len(opt.target_channels):
+                    print("model_config:", model_config)
+                    self.model.load_weights(model_path)
+                # self.model.load_weights(model_path)
         DSSIM_L1 = get_dssim_l1_loss()
         self.model.compile(optimizer='adam',
                     loss=DSSIM_L1,
@@ -366,6 +374,15 @@ class ImJoyPlugin():
                             validation_data=make_generator(sources['valid'], batch_size=opt.batch_size),
                             validation_steps=4, steps_per_epoch=my.config.steps, epochs=epochs, verbose=2, callbacks=[updateUI, checkpointer, tensorboard])
         self.model.save(os.path.join(opt.checkpoints_dir,  my.config.name + '__model__.hdf5'))
+
+        model_config = {}
+        model_config['input_size'] = opt.input_size
+        model_config['input_channels'] = len(opt.input_channels)
+        model_config['target_channels'] = len(opt.target_channels)
+
+        with open(os.path.join(opt.work_dir, 'model_config.json'), 'w') as f:
+            json.dump(model_config, f)
+
 
     async def freeze_model(self, my):
         if not self._initialized:
