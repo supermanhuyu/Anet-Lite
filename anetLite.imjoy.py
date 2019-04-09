@@ -14,6 +14,7 @@ from io import BytesIO
 import tensorflow as tf
 import json
 from keras import backend as K
+import threading
 
 os.chdir('Anet-Lite')
 from anet.options import Options
@@ -26,11 +27,13 @@ from anet.utils import export_model_to_js
 # import importlib
 # importlib.reload(UnetGenerator)
 
-
+abort = threading.Event()
 def plot_tensors(dash, tensor_list, label, titles):
     image_list = [tensor.reshape(tensor.shape[-3], tensor.shape[-2], -1) for tensor in tensor_list]
     displays = {}
-
+    def stop():
+        api.alert('stopped')
+        abort.set()
     for i in range(len(image_list)):
         ims = image_list[i]
         for j in range(ims.shape[2]):
@@ -68,12 +71,9 @@ class UpdateUI(Callback):
         self.dash = dash
         self.step = 0
         self.gen = gen
-        self.input_channels = []
-        self.target_channels = []
-        for i in opt.input_channels:
-            self.input_channels.append(i[0])
-        for i in opt.target_channels:
-            self.target_channels.append(i[0])
+        self.input_channels = [ch[0] for ch in opt.input_channels]
+        self.target_channels = [ch[0] for ch in opt.target_channels]
+        self.output_channels = ['output_'+ch[0] for ch in opt.target_channels]
 
     def on_batch_end(self, batch, logs):
         self.logs = logs
@@ -81,6 +81,8 @@ class UpdateUI(Callback):
         sys.stdout.flush()
         self.dash.updateCallback('onStep', self.step, {'mse': np.asscalar(logs['mean_squared_error']), 'dssim_l1': np.asscalar(logs['DSSIM_L1'])})
         self.step += 1
+        if abort.is_set():
+            raise Exception('Abort.')
 
     def on_epoch_end(self, epoch, logs):
         self.epoch = epoch
@@ -89,15 +91,16 @@ class UpdateUI(Callback):
         api.showStatus('training epoch:'+str(self.epoch)+'/'+str(self.total_epoch) + ' '+ str(logs))
         xbatch, ybatch = next(self.gen)
         ypbatch = self.model.predict(xbatch, batch_size=1)
-        tensor_list = [ypbatch, xbatch, ybatch]
+        tensor_list = [xbatch, ypbatch, ybatch]
         label = 'Step '+ str(self.step)
-        titles = [["output"], self.input_channels, self.target_channels]
+        titles = [self.input_channels, self.output_channels, self.target_channels]
         plot_tensors(self.dash, tensor_list, label, titles)
 
 
 class ImJoyPlugin():
     def __init__(self):
         self._initialized = False
+
     def download_data(self, my):
         if not self._initialized:
             api.alert('Please click `Anet-Lite` before downloading.')
@@ -117,6 +120,7 @@ class ImJoyPlugin():
         # os.remove(name_zip)
         api.showStatus('example data saved to ' + os.path.abspath(target_dir))
         self._opt.work_dir = target_dir
+
     def initialize(self, opt):
         # opt.work_dir = '{}/unet_data/train'.format(os.getcwd())
         self.model = UnetGenerator(input_size=opt.input_size, input_channels=opt.input_nc, target_channels=opt.target_nc, base_filter=opt.base_filter)
@@ -134,17 +138,19 @@ class ImJoyPlugin():
                     metrics=['mse', DSSIM_L1])
         self._initialized = True
         api.showStatus("A-net lite successfully initialized.")
+
     async def setup(self):
         #api.register(name="set working directory", run=self.set_work_dir, ui="set working directory for loading data and saving trained models")
         api.register(name="get example dataset", run=self.download_data, ui="download example data set to your workspace")
         api.register(name="load trained weights", run=self.load_model_weights, ui="load a trained weights for the model")
         api.register(name="train", run=self.train, ui="name:{id:'name', type:'string', placeholder:''}<br>"\
                 "epochs:{id:'epochs', type:'number', min:1, placeholder:100}<br>"\
-                "steps per epoch:{id:'steps', type:'number', min:1, placeholder:10}<br>"\
+                "steps per epoch:{id:'steps', type:'number', min:1, placeholder:30}<br>"\
                 "batch size:{id:'batchsize', type:'number', min:1, placeholder:4}<br>"
                 )
         api.register(name="freeze and export model", run=self.freeze_model, ui="freeze and export the graph as pb file")
         api.register(name="test", run=self.test, ui="number of images:{id:'num', type:'number', min:1, placeholder:10}<br>")
+
     async def load_model_weights(self, my):
         if not self._initialized:
             api.alert('Please click `Anet-Lite` before loading weights.')
@@ -158,9 +164,11 @@ class ImJoyPlugin():
                 api.showStatus('weights loaded from '+ weight_path)
         except:
             pass
+
     def export(self, my):
         opt = self._opt
         export_model_to_js(self.model, opt.work_dir+'/__js_model__')
+
     async def run(self, my):
         work_dir = await api.showFileDialog(title="Please select a working directory (with data)")
         api.setConfig('work_dir', work_dir)
@@ -185,6 +193,7 @@ class ImJoyPlugin():
         # opt.target_channels = [('mask', {'filter':'mask_edge*.png', 'loader':ImageLoader()})]
         self._opt = opt
         self.initialize(opt)
+
     async def test(self, my):
         if not self._initialized:
             api.alert('Please click `Anet-Lite` before testing.')
@@ -198,15 +207,18 @@ class ImJoyPlugin():
             os.makedirs(output_dir)
         gen = make_test_generator(source, batch_size=batch_size)
         api.showStatus('making predictions.')
-        output_channels = [c[0] for c in self._opt.target_channels]
         totalsize = len(source)
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Anet-lite Prediction", w=25, h=10, data={"display_mode": "all"})
+
+        input_channels = [ch[0] for ch in self._opt.input_channels]
+        output_channels = ['output_'+ch[0] for ch in self._opt.target_channels]
+
         for i in range(int(totalsize/batch_size+0.5)):
             xbatch, paths = next(gen)
             ypbatch = self.model.predict(xbatch, batch_size=batch_size)
-            tensor_list = [ypbatch, xbatch]
+            tensor_list = [xbatch, ypbatch]
             label = 'Sample '+ str(i)
-            titles = ["output", 'input']
+            titles = [input_channels, output_channels]
             plot_tensors(self.dash, tensor_list, label, titles)
             count +=batch_size
             for b in range(len(ypbatch)):
@@ -219,6 +231,7 @@ class ImJoyPlugin():
                     im.save(output_path+'_'+output_channels[i]+'_output.tif')
             api.showProgress(1.0*count/totalsize)
             api.showStatus('making predictions: {}/{}'.format(count, totalsize))
+
     async def train(self, my):
         if not self._initialized:
             api.alert('Please click `Anet-Lite` before training.')
@@ -229,6 +242,7 @@ class ImJoyPlugin():
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Anet-lite Training", w=25, h=10, data={"display_mode": "all", 'metrics': ['mse', 'dssim_l1'], 'callbacks': ['onStep']})
         updateUI = UpdateUI(epochs, self.dash, make_generator(sources['valid'], batch_size=1), opt)
         opt.batch_size = my.config.batchsize
+        abort.clear()
         tensorboard = TensorBoard(log_dir=os.path.join(opt.checkpoints_dir, my.config.name + 'logs'), histogram_freq=0, batch_size=32, write_graph=True, write_grads=False, write_images=True)
         checkpointer = ModelCheckpoint(filepath=os.path.join(opt.checkpoints_dir,  my.config.name + '__model__.hdf5'), verbose=1, save_best_only=True)
         self.model.fit_generator(make_generator(sources['train'], batch_size=opt.batch_size),
