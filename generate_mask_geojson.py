@@ -70,7 +70,7 @@ def generate_mask(files_proc,
         annot_dict_all, roi_size_all = annotationsImporter.load(file_proc)
 
         labels = list(set([annot_dict_all[k]['properties']['label'] for k in annot_dict_all.keys()]))
-        print(labels)
+        print("labels:", labels)
         for label in labels:
 
             # Filter the annotations by label
