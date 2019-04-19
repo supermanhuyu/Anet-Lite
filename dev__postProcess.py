@@ -31,40 +31,15 @@ simplify_tol = 1  # Tolerance for polygon simplification with shapely (0 to not 
 if os.path.exists(outputs_dir):
     for file in [f for f in os.listdir(outputs_dir) if 'MASK' in f]:
         file = os.path.join(outputs_dir, file)
-
         # Read png with input and output
-        output_png = io.imread(file)
-        # input_png = io.imread(file.replace('outputs.png', 'inputs.png'))
-
-        # Create empty arrays to store the relevant channels for postprocessing
-        img_output = np.zeros((output_png.shape[0], output_png.shape[1], 2))
-        # img_input = np.zeros((output_png.shape[0], output_png.shape[1], 1))
-
-        img_output[:, :, 0] = output_png[:, :, 0]  # Cell mask
-        img_output[:, :, 1] = output_png[:, :, 2]  # Nuclei mask
-        print("img_output.shape:", img_output.shape)
-
-        # img_output[:, :, 0] = input_png[:, :, 0]  # Image of cell
-
-        # Call function to perform segmentation
-        cytoplasm_mask, nuclei_mask = segmentationUtils.segment_cells_nuclei(img_output,
-                                                                             img_output,
-                                                                             h_threshold=h_threshold,
-                                                                             min_size_cell=min_size_cell,
-                                                                             min_size_nuclei=min_size_nuclei,
-                                                                             save_path=file.replace('.png', '_'))
-
-        print("cytoplasm_mask.shape:", cytoplasm_mask.shape)
-        print("nuclei_mask.shape:", nuclei_mask.shape)
-
+        mask = io.imread(file)
+        print("mask.shape:", mask.shape)
         # Call function to transform segmentation masks into (geojson) polygons
-        segmentationUtils.masks_to_polygon(cytoplasm_mask,
+        segmentationUtils.masks_to_polygon(mask,
                                            simplify_tol=simplify_tol,
                                            plot_simplify=False,
-                                           save_name=file.replace('.png', '__cells_polygon.json'))
+                                           save_name=file
+                                           .replace('.png', '.json')
+                                           .replace('MASK', 'jeojson.json'))
 
-        segmentationUtils.masks_to_polygon(nuclei_mask,
-                                           simplify_tol=simplify_tol,
-                                           plot_simplify=False,
-                                           save_name=file.replace('.png', '__nuclei_polygon.json'))
         print("segmentationUtils convert success")
