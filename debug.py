@@ -429,7 +429,7 @@ class ImJoyPlugin():
         for sample in samples:
             sample_annotation = sample["annotation"].replace("/tmp", "datasets")
             print(sample_annotation)
-            generate_mask(files_proc=[sample_annotation], image_size=(924, 624))
+            generate_mask(files_proc=[sample_annotation], image_size=(624, 924))
         return True
         pass
 

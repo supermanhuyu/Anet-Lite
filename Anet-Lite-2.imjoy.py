@@ -329,12 +329,6 @@ class ImJoyPlugin():
             api.alert('Please click `Anet-Lite` before training.')
             return
         opt = self._opt
-        print("opt.input_size:", opt.input_size)
-        print("opt.work_dir:", opt.work_dir)
-        print("opt.input_channels:", opt.input_channels)
-        print("opt.target_channels:", opt.target_channels)
-        print("opt.input_size:", opt.input_size)
-
 
         sources = GenericTransformedImages(opt)
         epochs = config.epochs
@@ -382,15 +376,15 @@ class ImJoyPlugin():
 
         self._opt = my_opt(config_json, config_mask)
         self.initialize(self._opt)
-        print("self._opt.work_dir:", self._opt.work_dir)
-        print("self._opt.input_channels:", self._opt.input_channels)
-        print("self._opt.target_channels:", self._opt.target_channels)
+        # print("self._opt.work_dir:", self._opt.work_dir)
+        # print("self._opt.input_channels:", self._opt.input_channels)
+        # print("self._opt.target_channels:", self._opt.target_channels)
 
         config = my_config()
-        print("config.name:", config.name)
-        print("config.epochs:", config.epochs)
-        print("config.steps:", config.steps)
-        print("config.batchsize:", config.batchsize)
+        # print("config.name:", config.name)
+        # print("config.epochs:", config.epochs)
+        # print("config.steps:", config.steps)
+        # print("config.batchsize:", config.batchsize)
 
         if not os.path.exists(os.path.join(self._opt.work_dir, "valid")):
             # copy train dir as valid dir
@@ -429,7 +423,7 @@ class ImJoyPlugin():
         for sample in samples:
             sample_annotation = sample["annotation"].replace("/tmp", "datasets")
             print(sample_annotation)
-            generate_mask(files_proc=[sample_annotation], image_size=(924, 624))
+            generate_mask(files_proc=[sample_annotation], image_size=(624, 924))
         return True
         pass
 
