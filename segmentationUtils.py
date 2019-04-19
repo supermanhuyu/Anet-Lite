@@ -247,7 +247,8 @@ def masks_to_polygon(img_mask,simplify_tol=0, plot_simplify=False, save_name=Non
             features.append(Feature(geometry=pol_loop))
                 
         else:
-            print(f'More than one / or no contour found for object {obj_int}')
+            # print(f'More than one / or no contour found for object {obj_int}')
+            print(obj_int)
     
     # Create geojson feature collection
     feature_collection = FeatureCollection(features)

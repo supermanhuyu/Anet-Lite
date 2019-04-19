@@ -42,6 +42,7 @@ if os.path.exists(outputs_dir):
 
         img_output[:, :, 0] = output_png[:, :, 0]  # Cell mask
         img_output[:, :, 1] = output_png[:, :, 2]  # Nuclei mask
+        print("img_output.shape:", img_output.shape)
 
         # img_output[:, :, 0] = input_png[:, :, 0]  # Image of cell
 
@@ -53,6 +54,9 @@ if os.path.exists(outputs_dir):
                                                                              min_size_nuclei=min_size_nuclei,
                                                                              save_path=file.replace('.png', '_'))
 
+        print("cytoplasm_mask.shape:", cytoplasm_mask.shape)
+        print("nuclei_mask.shape:", nuclei_mask.shape)
+
         # Call function to transform segmentation masks into (geojson) polygons
         segmentationUtils.masks_to_polygon(cytoplasm_mask,
                                            simplify_tol=simplify_tol,
@@ -63,3 +67,4 @@ if os.path.exists(outputs_dir):
                                            simplify_tol=simplify_tol,
                                            plot_simplify=False,
                                            save_name=file.replace('.png', '__nuclei_polygon.json'))
+        print("segmentationUtils convert success")
