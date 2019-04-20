@@ -324,6 +324,7 @@ class ImJoyPlugin():
 
     async def train_run(self, my):
         json_path = "datasets/anet_png/config.json"
+        print("json_path:", json_path)
 
         with open(json_path, "r") as f:
             json_content =f.read()

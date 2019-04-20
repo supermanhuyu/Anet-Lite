@@ -368,7 +368,7 @@ class BinaryMaskGenerator(MaskGenerator):
 
             else:
                 roi_type = roi['type']
-                raise NotImplementedError(f'Mask for roi type "{roi_type}" can not be created')
+                raise NotImplementedError('Mask for roi type "{}" can not be created'.format(roi_type))
 
         del draw
 
