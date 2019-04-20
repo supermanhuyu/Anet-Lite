@@ -230,7 +230,7 @@ class MaskGenerator():
         '''
 
         if not(mask_key in mask_dict.keys()):
-            print(f'Selected key ({mask_key})is not present in mask dictionary.')
+            print('Selected key ({})is not present in mask dictionary.'.format(mask_key))
             return
 
         # Save label - different labels are saved differently
