@@ -45,12 +45,12 @@ def generate_mask(files_proc,
         path, file = os.path.split(path_and_file)
         file_base, ext = os.path.splitext(file)
 
-        print("drive:", drive)
-        print("path_and_file:", path_and_file)
-        print("path:", path)
-        print("file:", file)
-        print("file_base:", file_base)
-        print("ext:", ext)
+        # print("drive:", drive)
+        # print("path_and_file:", path_and_file)
+        # print("path:", path)
+        # print("file:", file)
+        # print("file_base:", file_base)
+        # print("ext:", ext)
 
         print("channel_ident:", channel_ident)
 
@@ -112,4 +112,4 @@ def generate_mask(files_proc,
             #
             #     # Save
             #     file_name_save = os.path.join(drive,path, file_base + '__MASK_edgeWeight.png')
-            masks.save(mask_dict,'edge_weighted',file_name_save)
+            #     masks.save(mask_dict,'edge_weighted',file_name_save)

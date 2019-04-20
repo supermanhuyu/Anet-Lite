@@ -19,6 +19,7 @@ from keras import backend as K
 import threading
 import shutil
 import time
+from skimage import io
 
 os.chdir('Anet-Lite')
 from anet.options import Options
@@ -107,26 +108,26 @@ class UpdateUI(Callback):
         titles = [self.input_channels, self.output_channels, self.target_channels]
         plot_tensors(self.dash, tensor_list, label, titles)
 
-config_json = {
-    "samples": [{
-        "name":  "z010",
-        "annotation": "/tmp/example/train/z010/annotation.json",
-        "data": ["/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c002.png.base64",
-                 "/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c004.png.base64",
-                 "/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c007.png.base64"]
-    },{
-        "name":  "z010",
-        "annotation": "/tmp/example/train/z010/annotation.json",
-        "data": ["/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c002.png.base64",
-                 "/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c004.png.base64",
-                 "/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c007.png.base64"]
-    }],
-    "channel": {
-        "A": "c002",
-        "B": "c004",
-        "C": "c007",
-    }
-}
+# config_json = {
+#     "samples": [{
+#         "name":  "z010",
+#         "annotation": "/tmp/example/train/z010/annotation.json",
+#         "data": ["/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c002.png.base64",
+#                  "/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c004.png.base64",
+#                  "/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c007.png.base64"]
+#     },{
+#         "name":  "z010",
+#         "annotation": "/tmp/example/train/z010/annotation.json",
+#         "data": ["/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c002.png.base64",
+#                  "/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c004.png.base64",
+#                  "/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c007.png.base64"]
+#     }],
+#     "channel": {
+#         "A": "c002",
+#         "B": "c004",
+#         "C": "c007",
+#     }
+# }
 
 class my_config():
     def __init__(self, name="", epochs=100, batchsize=30, steps=2):
@@ -420,10 +421,12 @@ class ImJoyPlugin():
 
     def get_mask_by_json(self, config):
         samples = config["samples"]
+        mask = io.imread(samples[0]["data"][0].replace(".png.base64", ".png"))
+        print("mask.shape:", mask.shape)
         for sample in samples:
             sample_annotation = sample["annotation"].replace("/tmp", "datasets")
             print(sample_annotation)
-            generate_mask(files_proc=[sample_annotation], image_size=(624, 924))
+            generate_mask(files_proc=[sample_annotation], image_size=(mask.shape[0], mask.shape[1]))
         return True
         pass
 

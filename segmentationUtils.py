@@ -177,8 +177,7 @@ def segment_nuclei_cellcog(im, h_threshold=15, bg_window_size=100, min_size=1000
     return result_label_seg
 
 
-
-def masks_to_polygon(img_mask,simplify_tol=0, plot_simplify=False, save_name=None):
+def masks_to_polygon(img_mask, simplify_tol=0, plot_simplify=False, save_name=None):
     ''' 
     Find contours with skimage, simplify them (optional), store as geojson:
         
@@ -215,43 +214,46 @@ def masks_to_polygon(img_mask,simplify_tol=0, plot_simplify=False, save_name=Non
     
     Ncells = img_mask.max()   
     # Loop over all masks (except with index 0 which is background)
-    for i,obj_int in enumerate(range(1,Ncells)):
+    for i,obj_int in enumerate(range(1, Ncells+1)):
         
         # Create binary mask for current object and find contour
         img_mask_loop = np.zeros((img_mask.shape[0],img_mask.shape[1]))
-        img_mask_loop[img_mask==obj_int] = 1
+        img_mask_loop[img_mask == obj_int] = 1
         contour = measure.find_contours(img_mask_loop, 0.5)
         
         # Proceeed only if one contour was found
-        if len(contour) == 1:
-            
-            contour_asNumpy = contour[0]
-            contour_asList  = contour_asNumpy.tolist()
-    
-            # Simplify polygon if tolerance is set to any value except 0
-            if simplify_tol != 0:
-                poly_shapely = shapely_polygon(contour_asList)
-                poly_shapely_simple  = poly_shapely.simplify(simplify_tol, preserve_topology=False)
-                contour_asList  = list(poly_shapely_simple.exterior.coords)
-                contour_asNumpy = np.asarray(contour_asList)
-            
-                if plot_simplify:
-                    plot_polygons(poly_shapely,poly_shapely_simple,obj_int)
-                    
-                    
-            # Append to polygon list
-            contours.append(contour_asNumpy)
-            
-            # Create and append feature for geojson
-            pol_loop = geojson_polygon(contour_asList)
-            features.append(Feature(geometry=pol_loop))
-                
+        if len(contour) >= 1:
+            print("len(contour): ", len(contour))
+            for contour_asNumpy in contour:
+                print("contour_asNumpy.shape:", contour_asNumpy.shape)
+                # contour_asNumpy = contour[0]
+                contour_asList = contour_asNumpy.tolist()
+
+                # Simplify polygon if tolerance is set to any value except 0
+                if simplify_tol != 0:
+                    poly_shapely = shapely_polygon(contour_asList)
+                    poly_shapely_simple = poly_shapely.simplify(simplify_tol, preserve_topology=False)
+                    contour_asList = list(poly_shapely_simple.exterior.coords)
+                    # contour_asNumpy = np.asarray(contour_asList)
+
+                    if plot_simplify:
+                        plot_polygons(poly_shapely, poly_shapely_simple, obj_int)
+
+                # # Append to polygon list
+                # contours.append(contour_asNumpy)
+                # Create and append feature for geojson
+                pol_loop = geojson_polygon(contour_asList)
+                features.append(Feature(geometry=pol_loop, properties={"label": "nuclei"}))
+                # features.append(Feature(geometry=pol_loop))
+                # features_list.append(features)
+
         else:
             print("More than one / or no contour found for object:", obj_int)
+
     
     # Create geojson feature collection
     feature_collection = FeatureCollection(features)
-    
+
     # Save to json file
     if save_name:
         with open(save_name, 'w') as f:
