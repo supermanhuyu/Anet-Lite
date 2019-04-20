@@ -323,6 +323,38 @@ class ImJoyPlugin():
             json.dump(model_config, f)
 
     async def train_run(self, my):
+        json_path = "datasets/anet_png/config.json"
+
+        with open(json_path, "r") as f:
+            json_content =f.read()
+
+        config_mask = {
+            "channel": {
+                "distMap": "*_distMap.png",
+                "fill": "*_fill.png"
+            }}
+        config_json = json.loads(json_content)
+        print("config_json:", config_json)
+        # await self.get_data_by_config(config=config_json)
+        # self.get_mask_by_json(config=config_json)
+
+        self._opt = my_opt(config_json, config_mask)
+        self.initialize(self._opt)
+        print("self._opt.work_dir:", self._opt.work_dir)
+        print("self._opt.input_channels:", self._opt.input_channels)
+        print("self._opt.target_channels:", self._opt.target_channels)
+
+        config = my_config()
+        print("config.name:", config.name)
+        print("config.epochs:", config.epochs)
+        print("config.steps:", config.steps)
+        print("config.batchsize:", config.batchsize)
+
+        if not os.path.exists(os.path.join(self._opt.work_dir, "valid")):
+            # copy train dir as valid dir
+            shutil.copytree(os.path.join(self._opt.work_dir, "train"), os.path.join(self._opt.work_dir, "valid"))
+        await self.train_2(config)
+
         pass
 
     async def train_2(self, config):
@@ -421,7 +453,7 @@ class ImJoyPlugin():
 
     def get_mask_by_json(self, config):
         samples = config["samples"]
-        mask = io.imread(samples[0]["data"][0].replace(".png.base64", ".png"))
+        mask = io.imread(samples[0]["data"][0].replace(".png.base64", ".png").replace("/tmp", "datasets"))
         print("mask.shape:", mask.shape)
         for sample in samples:
             sample_annotation = sample["annotation"].replace("/tmp", "datasets")

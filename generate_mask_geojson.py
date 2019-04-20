@@ -61,7 +61,7 @@ def generate_mask(files_proc,
         print("file_ch:", file_ch)
 
         if not file_ch:
-            print(f'No channel identifier found in file name {file_base}')
+            print('No channel identifier found in file name {}'.format(file_base))
             continue
 
         print(f'Mask type identified: {file_ch}')
