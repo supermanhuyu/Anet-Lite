@@ -64,7 +64,7 @@ def generate_mask(files_proc,
             print('No channel identifier found in file name {}'.format(file_base))
             continue
 
-        print(f'Mask type identified: {file_ch}')
+        print('Mask type identified: {}'.format(file_ch))
 
         # Read annotation:  Correct class has been selected based on annot_type
         annot_dict_all, roi_size_all = annotationsImporter.load(file_proc)
@@ -98,7 +98,7 @@ def generate_mask(files_proc,
             # Distance map
             if 'distance' in channels_new[file_ch]['masks']:
                 print(' .... creating distance maps .....')
-                mask_dict    = distMapMasks.generate(annot_dict,mask_dict)
+                mask_dict = distMapMasks.generate(annot_dict,mask_dict)
 
                 # Save
                 file_name_save = os.path.join(drive,path, file_base + '__MASK_distMap.png')
