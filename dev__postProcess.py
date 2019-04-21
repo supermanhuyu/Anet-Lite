@@ -7,8 +7,8 @@ import numpy as np
 import segmentationUtils
 importlib.reload(segmentationUtils)
 
-#
-# outputs_dir = 'datasets/anet/train/w11_bac_bora_4437_p02_/'
+
+# outputs_dir = 'datasets/anet_png/train/w11_bac_bora_4437_p02_/'
 # # outputs_dir = 'datasets/example/train/z010/'
 # simplify_tol = 0  # Tolerance for polygon simplification with shapely (0 to not simplify)
 #
@@ -30,9 +30,10 @@ importlib.reload(segmentationUtils)
 #         print("segmentationUtils convert success")
 
 
-def masks_to_annotation(filepath, save_name, simplify_tol=0, plot_simplify=False,):
+def masks_to_annotation(filepath, save_name, simplify_tol=0, plot_simplify=False):
     mask = io.imread(filepath)
-    segmentationUtils.masks_to_polygon(mask,
-                                       simplify_tol=simplify_tol,
-                                       plot_simplify=plot_simplify,
-                                       save_name=save_name)
+    contours, feature_collection = segmentationUtils.masks_to_polygon(mask,
+                                                                      simplify_tol=simplify_tol,
+                                                                      plot_simplify=plot_simplify,
+                                                                      save_name=save_name)
+    return feature_collection

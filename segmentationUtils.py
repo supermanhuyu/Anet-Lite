@@ -223,9 +223,9 @@ def masks_to_polygon(img_mask, simplify_tol=0, plot_simplify=False, save_name=No
         
         # Proceeed only if one contour was found
         if len(contour) >= 1:
-            print("len(contour): ", len(contour))
+            # print("len(contour): ", len(contour))
             for contour_asNumpy in contour:
-                print("contour_asNumpy.shape:", contour_asNumpy.shape)
+                # print("contour_asNumpy.shape:", contour_asNumpy.shape)
                 # contour_asNumpy = contour[0]
                 contour_asList = contour_asNumpy.tolist()
 
@@ -248,7 +248,8 @@ def masks_to_polygon(img_mask, simplify_tol=0, plot_simplify=False, save_name=No
                 # features_list.append(features)
 
         else:
-            print("More than one / or no contour found for object:", obj_int)
+            pass
+            # print("More than one / or no contour found for object:", obj_int)
 
     
     # Create geojson feature collection

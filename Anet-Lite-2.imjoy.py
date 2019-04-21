@@ -30,6 +30,7 @@ from anet.data.utils import make_generator, make_test_generator
 from anet.networks import UnetGenerator, get_dssim_l1_loss
 from anet.utils import export_model_to_js
 from generate_mask_geojson import generate_mask
+from dev__postProcess import masks_to_annotation
 
 # import importlib
 # importlib.reload(UnetGenerator)
@@ -130,7 +131,7 @@ class UpdateUI(Callback):
 # }
 
 class my_config():
-    def __init__(self, name="", epochs=100, batchsize=30, steps=2):
+    def __init__(self, name="", epochs=2, batchsize=3, steps=2):
         self.name = name
         self.epochs = epochs
         self.steps = steps
@@ -164,6 +165,8 @@ def my_opt(config, mask_config):
 class ImJoyPlugin():
     def __init__(self):
         self._initialized = False
+        self.br_dir = "/tmp"
+        self.home_dir = "/home"
 
     def download_data(self, my):
         if not self._initialized:
@@ -226,6 +229,7 @@ class ImJoyPlugin():
                      )
         api.register(name="freeze and export model", run=self.freeze_model, ui="freeze and export the graph as pb file")
         api.register(name="train_run", run=self.train_run, ui="train_run")
+        api.register(name="test_run", run=self.test_run, ui="test_run")
         api.register(name="test", run=self.test,
                      ui="number of images:{id:'num', type:'number', min:1, placeholder:10}<br>")
 
@@ -358,6 +362,11 @@ class ImJoyPlugin():
 
         pass
 
+    async def test_run(self, my):
+        sample_path = {"samples": ["datasets/anet_png/test/w11_bac_tubggcp3_4430_p12_"]}
+        await self.auto_test(samples=sample_path)
+        pass
+
     async def train_2(self, config):
         if not self._initialized:
             api.alert('Please click `Anet-Lite` before training.')
@@ -393,7 +402,7 @@ class ImJoyPlugin():
 
     async def auto_train(self, configPath):
         # await self.fs_readfile(configPath["configPath"])
-        json_path = configPath["configPath"].replace("/tmp", "datasets")
+        json_path = configPath["configPath"].replace(self.br_dir, "datasets").replace(self.home_dir, "datasets")
         json_content = await self.readFile(configPath["configPath"])
         with open(json_path, "w") as f:
             f.write(json_content)
@@ -425,16 +434,81 @@ class ImJoyPlugin():
             shutil.copytree(os.path.join(self._opt.work_dir, "train"), os.path.join(self._opt.work_dir, "valid"))
         await self.train_2(config)
 
+    def cus_make_test_generator(self, source, sample_path, batch_size=1):
+        x, path = [], []
+        count = 0
+        for d in source:
+            # print("d['path']:", d['path'])
+            if d['path'] == sample_path:
+                print("d['path']:", d['path'])
+                x.append(d['A'])
+                path.append(d['path'])
+                if len(x) >= batch_size:
+                    x = np.stack(x, axis=0)
+                    m, s = x.mean(), x.std() + 0.0001
+                    x = (x - m) / s
+                    yield x, path
+                    x, path = [], []
+                    count += 1
+        return
+
+    async def auto_test(self, samples):
+        sample_path = samples["samples"][0]
+        print("start run GenericTransformedImages ...")
+        if not self._initialized:
+            api.alert('Please click `Anet-Lite` before testing.')
+            return
+        sources = GenericTransformedImages(self._opt)
+        batch_size = 1
+        source = sources['test']
+        count = 0
+        # output_dir = os.path.join(self._opt.work_dir, 'outputs')
+        # if not os.path.exists(output_dir):
+        #     os.makedirs(output_dir)
+        print("start run cus_make_test_generator ...")
+        gen = self.cus_make_test_generator(source, sample_path)
+        api.showStatus('making predictions.')
+        totalsize = len(source)
+        self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Anet-lite Prediction", w=25, h=10,
+                                           data={"display_mode": "all"})
+
+        input_channels = [ch[0] for ch in self._opt.input_channels]
+        output_channels = ['output_MASK_' + ch[0] for ch in self._opt.target_channels]
+        label = 'Sample '
+        titles = [input_channels, output_channels]
+        print("titles:", titles)
+
+        xbatch, paths = next(gen)
+        print("start run predict ...")
+        ypbatch = self.model.predict(xbatch, batch_size=batch_size)
+        tensor_list = [xbatch, ypbatch]
+        plot_tensors(self.dash, tensor_list, label, titles)
+        count += batch_size
+        for b in range(len(ypbatch)):
+            image = ypbatch[b]
+            path = paths[b]
+            _, name = os.path.split(path)
+            # output_path = os.path.join(sample_path, name)
+            for i in range(image.shape[2]):
+                misc.imsave(os.path.join(sample_path, output_channels[i] + '.png'),
+                            image[:, :, i].astype('float32'))
+        api.showProgress(1.0 * count / totalsize)
+        api.showStatus('making predictions: {}/{}'.format(count, totalsize))
+        mask_file = os.path.join(sample_path, output_channels[0] + '.png')
+        save_name = os.path.join(sample_path, 'annotation_MASK.json')
+        annotation_string = json.dumps(masks_to_annotation(mask_file, save_name, simplify_tol=0, plot_simplify=False))
+        return annotation_string
+
     async def get_data_by_config(self, config):
         samples = config["samples"]
         for sample in samples:
 
             # save annotation file
             sample_annotation = sample["annotation"]
-            saved_dir = os.path.dirname(sample_annotation).replace("/tmp", "datasets")
+            saved_dir = os.path.dirname(sample_annotation).replace(self.br_dir, "datasets")
             if not os.path.exists(saved_dir):
                 os.makedirs(saved_dir)
-            saved_path = sample_annotation.replace("/tmp", "datasets")
+            saved_path = sample_annotation.replace(self.br_dir, "datasets")
             anno_content = await self.readFile(sample_annotation)
             with open(saved_path, "w") as f:
                 f.write(anno_content)
@@ -443,7 +517,7 @@ class ImJoyPlugin():
             sample_data = sample["data"]
             for file in sample_data:
                 file_content = await self.readFile(file)
-                file_path = file.replace("/tmp", "datasets")
+                file_path = file.replace(self.br_dir, "datasets")
                 if file_path.endswith(".png.base64"):
                     file_path = file_path.replace(".png.base64", ".png")
                     with open(file_path, "wb") as f:
@@ -454,10 +528,10 @@ class ImJoyPlugin():
 
     def get_mask_by_json(self, config):
         samples = config["samples"]
-        mask = io.imread(samples[0]["data"][0].replace(".png.base64", ".png").replace("/tmp", "datasets"))
+        mask = io.imread(samples[0]["data"][0].replace(".png.base64", ".png").replace(self.br_dir, "datasets"))
         print("mask.shape:", mask.shape)
         for sample in samples:
-            sample_annotation = sample["annotation"].replace("/tmp", "datasets")
+            sample_annotation = sample["annotation"].replace(self.br_dir, "datasets")
             print(sample_annotation)
             generate_mask(files_proc=[sample_annotation], image_size=(mask.shape[0], mask.shape[1]))
         return True
@@ -477,8 +551,8 @@ class ImJoyPlugin():
 
 
     def fs_readfile(self, path):
-        saved_dir = os.path.dirname(path).replace("/tmp", "datasets")
-        saved_path = path.replace("/tmp", "datasets")
+        saved_dir = os.path.dirname(path).replace(self.br_dir, "datasets")
+        saved_path = path.replace(self.br_dir, "datasets")
 
         if not os.path.exists(saved_dir):
             os.makedirs(saved_dir)
