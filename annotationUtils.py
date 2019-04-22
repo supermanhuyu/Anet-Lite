@@ -90,7 +90,7 @@ class GeojsonImporter(AnnotationImporter):
     ''' Class to import manual annotations from GeoJson files. '''
 
 
-    def __init__(self,image_size=(2048,2048)):
+    def __init__(self, image_size=(2048,2048)):
         '''
         Initiate annotation dictionary.
 
@@ -98,7 +98,7 @@ class GeojsonImporter(AnnotationImporter):
             image_size (tuple): size of image.
 
         '''
-        self.image_size   = image_size
+        self.image_size = image_size
 
 
     def load(self, file_open):
@@ -115,6 +115,13 @@ class GeojsonImporter(AnnotationImporter):
 
         with open(file_open, encoding='utf-8-sig') as fh:
             data_json = json.load(fh)
+
+
+        # Overwrite default file size if bounding box is present
+        if 'bbox' in data_json:
+            self.image_size = (int(data_json['bbox'][2]-data_json['bbox'][0]+1),
+                               int(data_json['bbox'][3]-data_json['bbox'][1]+1))
+
 
         # Loop over list and create simple dictionary & get size of annotations
         annot_dict = {}
@@ -138,65 +145,8 @@ class GeojsonImporter(AnnotationImporter):
                  annot_dict[key_annot]['pos'][:, 0].min(),
                  annot_dict[key_annot]['pos'][:, 1].max()
                  - annot_dict[key_annot]['pos'][:, 1].min()])
-        print('skipped gemetry type(s):', skipped)
-        return annot_dict, roi_size_all
-
-
-
-class FijiImporter(AnnotationImporter):
-    ''' Class to import manual annotations from FIJI ROI files. '''
-
-
-    def __init__(self,image_size=(2048,2048)):
-        '''
-        Initiate annotation dictionary.
-
-        Args:
-            image_size (tuple): size of image.
-
-        '''
-        self.image_size   = image_size
-
-
-
-    def load(self, file_open):
-        '''
-        Read folder content based on defined config.
-
-        Args:
-            file_open (string): file-name of annotation.
-
-        Returns:
-            annot_dict (dictionary): contains all annotated elements
-            roi_size_all (list): contains size of each annotated element
-        '''
-
-        # Open ROI file
-        roi_dict_complete = read_roi_zip(file_open)
-
-
-        # Simplify dictionary & get size of annotations
-        annot_dict = {}
-        roi_size_all = []
-
-        for key_roi, val_roi in roi_dict_complete.items():
-
-            # Simplified dictionary: coordinates and annotation type
-            annot_dict[key_roi] = {}
-            annot_dict[key_roi]['pos'] = np.column_stack(
-                (val_roi['y'], val_roi['x']))
-            annot_dict[key_roi]['type'] = val_roi['type']
-
-            # Store size of regions
-            roi_size_all.append(
-                [annot_dict[key_roi]['pos'][:, 0].max() -
-                 annot_dict[key_roi]['pos'][:, 0].min(),
-                 annot_dict[key_roi]['pos'][:, 1].max()
-                 - annot_dict[key_roi]['pos'][:, 1].min()])
-
-
-        return annot_dict, roi_size_all
-
+        print('Skipped geometry type(s):', skipped)
+        return annot_dict, roi_size_all, self.image_size
 
 
 
@@ -230,7 +180,7 @@ class MaskGenerator():
         '''
 
         if not(mask_key in mask_dict.keys()):
-            print('Selected key ({})is not present in mask dictionary.'.format(mask_key))
+            print(f'Selected key ({mask_key})is not present in mask dictionary.')
             return
 
         # Save label - different labels are saved differently
@@ -368,7 +318,7 @@ class BinaryMaskGenerator(MaskGenerator):
 
             else:
                 roi_type = roi['type']
-                raise NotImplementedError('Mask for roi type "{}" can not be created'.format(roi_type))
+                raise NotImplementedError(f'Mask for roi type "{roi_type}" can not be created')
 
         del draw
 

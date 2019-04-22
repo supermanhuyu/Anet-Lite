@@ -29,8 +29,7 @@ from anet.data.file_loader import ImageLoader
 from anet.data.utils import make_generator, make_test_generator
 from anet.networks import UnetGenerator, get_dssim_l1_loss
 from anet.utils import export_model_to_js
-from generate_mask_geojson import generate_mask
-from dev__postProcess import masks_to_annotation
+from generate_mask_geojson import gen_mask_from_geojson, masks_to_annotation
 
 # import importlib
 # importlib.reload(UnetGenerator)
@@ -335,8 +334,10 @@ class ImJoyPlugin():
 
         config_mask = {
             "channel": {
-                "distMap": "*_distMap.png",
-                "fill": "*_fill.png"
+                # "distmap": "*_distmap.png",
+                # "filled": "*_filled.png",
+                "cells_filled": "cells_filled.png",
+                "nuclei_filled": "nuclei_filled.png",
             }}
         config_json = json.loads(json_content)
         print("config_json:", config_json)
@@ -409,8 +410,10 @@ class ImJoyPlugin():
 
         config_mask = {
             "channel": {
-                "distMap": "*_distMap.png",
-                "fill": "*_fill.png"
+                # "distmap": "*_distmap.png",
+                # "filled": "*_filled.png",
+                "cells_filled": "cells_filled.png",
+                "nuclei_filled": "nuclei_filled.png",
             }}
         config_json = json.loads(json_content)
         print("config_json:", config_json)
@@ -473,7 +476,7 @@ class ImJoyPlugin():
                                            data={"display_mode": "all"})
 
         input_channels = [ch[0] for ch in self._opt.input_channels]
-        output_channels = ['output_MASK_' + ch[0] for ch in self._opt.target_channels]
+        output_channels = [ch[0] + '_output'  for ch in self._opt.target_channels]
         label = 'Sample '
         titles = [input_channels, output_channels]
         print("titles:", titles)
@@ -494,9 +497,9 @@ class ImJoyPlugin():
                             image[:, :, i].astype('float32'))
         api.showProgress(1.0 * count / totalsize)
         api.showStatus('making predictions: {}/{}'.format(count, totalsize))
-        mask_file = os.path.join(sample_path, output_channels[0] + '.png')
-        save_name = os.path.join(sample_path, 'annotation_MASK.json')
-        annotation_string = json.dumps(masks_to_annotation(mask_file, save_name, simplify_tol=0, plot_simplify=False))
+        # mask_file = os.path.join(sample_path, output_channels[0] + '.png')
+        # save_name = os.path.join(sample_path, 'annotation_MASK.json')
+        annotation_string = json.dumps(masks_to_annotation(sample_path))
         return annotation_string
 
     async def get_data_by_config(self, config):
@@ -528,12 +531,10 @@ class ImJoyPlugin():
 
     def get_mask_by_json(self, config):
         samples = config["samples"]
-        mask = io.imread(samples[0]["data"][0].replace(".png.base64", ".png").replace(self.br_dir, "datasets"))
-        print("mask.shape:", mask.shape)
         for sample in samples:
             sample_annotation = sample["annotation"].replace(self.br_dir, "datasets")
             print(sample_annotation)
-            generate_mask(files_proc=[sample_annotation], image_size=(mask.shape[0], mask.shape[1]))
+            gen_mask_from_geojson(files_proc=[sample_annotation])
         return True
         pass
 
@@ -548,7 +549,6 @@ class ImJoyPlugin():
 
         api.fs.readFile(path, 'utf8', cb)
         return fut
-
 
     def fs_readfile(self, path):
         saved_dir = os.path.dirname(path).replace(self.br_dir, "datasets")
@@ -618,4 +618,3 @@ api.export(ImJoyPlugin())
 #     test_run.train_run("")
 
 </script>
-

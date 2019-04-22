@@ -1,11 +1,16 @@
-from generate_mask_geojson import generate_mask
-import os
-from skimage import io
-image_size = (2048, 2048)
-files_proc = ['datasets/anet_png/test/w11_bac_tubggcp3_4430_p12_/annotation.json']
+# # generate mask from geojson
+# from generate_mask_geojson import gen_mask_from_geojson
+# import os
+# from skimage import io
+# image_size = (2048, 2048)
+# files_proc = ['datasets/anet_png/test/w11_bac_tubggcp3_4430_p12_/annotation.json']
+# gen_mask_from_geojson(files_proc=files_proc, image_size=image_size)
 
-generate_mask(files_proc=files_proc, image_size=image_size)
+# generate annotaion from mask
 
+
+
+# # convert tif to png
 # import os
 # import shutil
 # from PIL import Image
