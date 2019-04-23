@@ -332,17 +332,22 @@ class ImJoyPlugin():
         with open(json_path, "r") as f:
             json_content =f.read()
 
-        config_mask = {
-            "channel": {
-                # "distmap": "*_distmap.png",
-                # "filled": "*_filled.png",
-                "cells_filled": "cells_filled.png",
-                "nuclei_filled": "nuclei_filled.png",
-            }}
+        # config_mask = {
+        #     "channel": {
+        #         # "distmap": "*_distmap.png",
+        #         # "filled": "*_filled.png",
+        #         "cells_filled": "cells_filled.png",
+        #         "nuclei_filled": "nuclei_filled.png",
+        #     }}
         config_json = json.loads(json_content)
         print("config_json:", config_json)
         # await self.get_data_by_config(config=config_json)
         # self.get_mask_by_json(config=config_json)
+        config_mask = {
+            "channel": {}
+        }
+        for chan in config_json["channel"].keys():
+            config_mask["channel"][chan+"_filled"] = chan+"_filled"
 
         self._opt = my_opt(config_json, config_mask)
         self.initialize(self._opt)
@@ -408,17 +413,23 @@ class ImJoyPlugin():
         with open(json_path, "w") as f:
             f.write(json_content)
 
-        config_mask = {
-            "channel": {
-                # "distmap": "*_distmap.png",
-                # "filled": "*_filled.png",
-                "cells_filled": "cells_filled.png",
-                "nuclei_filled": "nuclei_filled.png",
-            }}
+        # config_mask = {
+        #     "channel": {
+        #         # "distmap": "*_distmap.png",
+        #         # "filled": "*_filled.png",
+        #         "cells_filled": "cells_filled.png",
+        #         "nuclei_filled": "nuclei_filled.png",
+        #     }}
         config_json = json.loads(json_content)
         print("config_json:", config_json)
         await self.get_data_by_config(config=config_json)
         self.get_mask_by_json(config=config_json)
+        config_mask = {
+            "channel": {}
+        }
+        for chan in config_json["channel"].keys():
+            config_mask["channel"][chan+"_filled"] = chan+"_filled"
+
 
         self._opt = my_opt(config_json, config_mask)
         self.initialize(self._opt)
