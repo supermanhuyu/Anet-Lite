@@ -1,3 +1,117 @@
+<docs lang="markdown">
+# Anet-lite
+
+A generic plugin for image-to-image translation with A-net.
+
+## Usage
+
+### Data preparation
+Your data should be organized according to the following structure
+
+```
+ - train
+    - sample1
+      - channelA.png
+      - channelB.png
+      - channelC.png
+    - sample2
+      - channelA.png
+      - channelB.png
+      - channelC.png
+    - ...
+ - valid
+    - sample20
+      - channelA.png
+      - channelB.png
+      - channelC.png
+    - ...
+ - test
+    - sample43
+      - channelA.png
+      - channelC.png
+    - sample44
+      - channelA.png
+      - channelC.png
+```
+In the above folder structure, `train/valid/test` are three folders, `sample1`...`sample44` are sample folders, within the sample folder, it contains images with different channels.
+
+For the naming, you have to use `train`/`valid`/`test` as the top level folder name, but the sample name can be choose freely.
+You can also choose different channel names (e.g. `DAPI`, `C5`), but you need to make it consistent accross all the sample folder.
+
+These channel names will be used as an identifier for the plugin to recognize them, you will be asked to specify them when you `set working directory`.
+
+### Set working directory and parameters
+
+If you have the samples pepared the next step is to `set working directory` to the root folder of your samples.
+
+And you will be asked to specify the identifiers for your plugin.
+
+The following parameter can be configured:
+ * input identifiers and output identifiers: a string which specifies the naming pattern of each input and output channels, for example, the above folder structure contains `channelA.png`, `channelB.png` and `channelC.png`,
+ if we want to use all the `channelA.png` and `channelC.png` as input channels, we can set `Cells=channelA*.png,DAPI=channelC*.png`,
+ where before `=` is the name we given for each channel, and we used `,` to seperate channels. Similary for the input channels, we can specify `Mask=channelB*.png`.
+
+Here we used a `*` here which means it can be replaced with any symbol, here there is no extra, it is designed for when there are multiple images belongs to the same channel.
+
+## Optionally, loading previously trained models
+
+## start the training
+
+The training will relying on two folders named `train` and `valid`, you need to make sure you have them in your working directory.
+
+You can specify a training name, which will be used a prefix for saving models and logs.
+Choose the `epochs`, `step per epoch` and `batch size` you want to train.
+
+Then you can start training by click on the plugin menu.
+
+If the training is done, you will get your model located in the `working directory`, the folder will be called `__model__`.
+
+You can load the file named `*__model__.h5` next time if you want to start another training with this one (aka warm start).
+
+Or you can load the trained model for testing new images.
+
+## Testing/Inferencing
+Place your files with all the input channels in a folder `test` and you will be able to run prediction on them.
+
+By clicking `test` in the plugin menu, you will start the prediction.
+
+Once done, the result will be saved automatically into the testing folder.
+
+</docs>
+
+<config lang="json">
+{
+  "name": "Anet-Lite",
+  "type": "native-python",
+  "version": "0.2.0",
+  "api_version": "0.1.3",
+  "description": "A generic plugin for image-to-image translation with A-net.",
+  "tags": ["CPU", "GPU", "Windows-CPU", "Window-GPU"],
+  "ui": ["Generic Image-to-Image Translation",
+        "input identifiers: {id:'input_ids', type: 'string', placeholder: 'EM=EM*.png'}",
+        "target identifiers: {id:'target_ids', type: 'string', placeholder: 'Mask=Mask*.png'}",
+        "base filter num: {id:'base_filter_num', type: 'number', min: 8, placeholder: 16}",
+        "input size: {id:'input_size', type: 'number', min: 256, placeholder: 256}"
+    ],
+  "inputs": null,
+  "outputs": null,
+  "icon": null,
+  "env": {
+    "CPU":["conda create -n anet-cpu python=3.6"],
+    "GPU": ["conda create -n anet-gpu2 python=3.6"],
+    "Windows-CPU": ["conda create -n anet-win-cpu python=3.6"],
+    "Windows-GPU": ["conda create -n anet-win-gpu python=3.6"]
+  },
+  "requirements": {"CPU":["repo: https://github.com/oeway/Anet-Lite", "scikit-image", "geojson", "shapely", "descartes", "geojson", "palettable", "tensorflow==1.5", "keras==2.2.1", "Pillow", "git+https://www.github.com/keras-team/keras-contrib.git", "pytest"],
+                    "GPU": ["repo: https://github.com/oeway/Anet-Lite", "scikit-image", "geojson", "shapely", "descartes", "geojson", "palettable", "tensorflow-gpu==1.5", "keras==2.2.1", "Pillow", "git+https://www.github.com/keras-team/keras-contrib.git", "pytest"],
+                    "Windows-CPU":["repo: https://github.com/oeway/Anet-Lite", "scikit-image", "geojson", "shapely", "descartes", "geojson", "palettable", "tensorflow==1.2", "keras==2.2.1", "Pillow", "git+https://www.github.com/keras-team/keras-contrib.git", "pytest"],
+                    "Windows-GPU": ["repo: https://github.com/oeway/Anet-Lite", "scikit-image", "geojson", "shapely", "descartes", "geojson", "palettable", "tensorflow-gpu==1.2", "keras==2.2.1", "Pillow", "git+https://www.github.com/keras-team/keras-contrib.git", "pytest"]
+   },
+   "flags": [],
+  "dependencies": ["oeway/ImJoy-Plugins:Im2Im-Dashboard"]
+}
+</config>
+
 <script lang="python">
 import os
 import sys
@@ -110,6 +224,27 @@ class UpdateUI(Callback):
         titles = [self.input_channels, self.output_channels, self.target_channels]
         plot_tensors(self.dash, tensor_list, label, titles)
 
+# config_json = {
+#     "samples": [{
+#         "name":  "z010",
+#         "annotation": "/tmp/example/train/z010/annotation.json",
+#         "data": ["/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c002.png.base64",
+#                  "/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c004.png.base64",
+#                  "/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c007.png.base64"]
+#     },{
+#         "name":  "z010",
+#         "annotation": "/tmp/example/train/z010/annotation.json",
+#         "data": ["/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c002.png.base64",
+#                  "/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c004.png.base64",
+#                  "/tmp/example/train/z010/3500001066_100X_20170712_2r-Scene-6-P35-F05_z010_c007.png.base64"]
+#     }],
+#     "channel": {
+#         "A": "c002",
+#         "B": "c004",
+#         "C": "c007",
+#     }
+# }
+
 class my_config():
     def __init__(self, name="", epochs=2, batchsize=3, steps=2):
         self.name = name
@@ -135,7 +270,7 @@ def my_opt(config, mask_config):
 
     opt.channel = mask_config["channel"]
     for name, filter_c in opt.channel.items():
-        opt.target_channels.append((name, {'filter': "*"+filter_c+"*", 'loader': ImageLoader()},))
+        opt.target_channels.append((name, {'filter': filter_c, 'loader': ImageLoader()},))
 
     opt.input_nc = len(opt.input_channels)
     opt.target_nc = len(opt.target_channels)
@@ -253,7 +388,6 @@ def masks_to_annotation(outputs_dir):
             mask_img = io.imread(file_full)
             print("mask_img.shape:", mask_img.shape)
             mask = measure.label(mask_img)
-            # mask = mask_img
 
             # Here summarizing the geojson should occur
             image_size = mask_img.shape  # This might cause problems if any kind of binning was performed
@@ -278,10 +412,12 @@ def masks_to_annotation(outputs_dir):
             f.close()
 
 
+
 class ImJoyPlugin():
     def __init__(self):
         self._initialized = False
-        self.br_dir = "/home"
+        self.br_dir = "/tmp"
+        self.home_dir = "/home"
 
     def download_data(self, my):
         if not self._initialized:
@@ -443,16 +579,25 @@ class ImJoyPlugin():
 
     async def train_run(self, my):
         json_path = "datasets/anet_png/config.json"
-        # json_path = "datasets/example/config.json"
         print("json_path:", json_path)
 
         with open(json_path, "r") as f:
             json_content =f.read()
+
+        # config_mask = {
+        #     "channel": {
+        #         # "distmap": "*_distmap.png",
+        #         # "filled": "*_filled.png",
+        #         "cells_filled": "cells_filled.png",
+        #         "nuclei_filled": "nuclei_filled.png",
+        #     }}
         config_json = json.loads(json_content)
         print("config_json:", config_json)
         # await self.get_data_by_config(config=config_json)
         # self.get_mask_by_json(config=config_json)
-        config_mask = {"channel": {}}
+        config_mask = {
+            "channel": {}
+        }
         for chan in config_json["channel"].keys():
             config_mask["channel"][chan+"_filled"] = chan+"_filled"
 
@@ -476,9 +621,7 @@ class ImJoyPlugin():
         pass
 
     async def test_run(self, my):
-        samples = os.listdir(os.path.join(self._opt.work_dir, "test"))
-
-        sample_path = {"samples": samples[:1]}
+        sample_path = {"samples": ["datasets/anet_png/test/w11_bac_tubggcp3_4430_p12_"]}
         await self.auto_test(samples=sample_path)
         pass
 
@@ -516,19 +659,26 @@ class ImJoyPlugin():
             json.dump(model_config, f)
 
     async def auto_train(self, configPath):
-        print("configPath:", configPath)
         # await self.fs_readfile(configPath["configPath"])
-        json_path = configPath["configPath"].replace(self.br_dir, "datasets")
+        json_path = configPath["configPath"].replace(self.br_dir, "datasets").replace(self.home_dir, "datasets")
         json_content = await self.readFile(configPath["configPath"])
-        if not os.path.exists(os.path.dirname(json_path)):
-            os.makedirs(os.path.dirname(json_path))
         with open(json_path, "w") as f:
             f.write(json_content)
+
+        # config_mask = {
+        #     "channel": {
+        #         # "distmap": "*_distmap.png",
+        #         # "filled": "*_filled.png",
+        #         "cells_filled": "cells_filled.png",
+        #         "nuclei_filled": "nuclei_filled.png",
+        #     }}
         config_json = json.loads(json_content)
         print("config_json:", config_json)
         await self.get_data_by_config(config=config_json)
         self.get_mask_by_json(config=config_json)
-        config_mask = {"channel": {}}
+        config_mask = {
+            "channel": {}
+        }
         for chan in config_json["channel"].keys():
             config_mask["channel"][chan+"_filled"] = chan+"_filled"
 
@@ -731,3 +881,31 @@ api.export(ImJoyPlugin())
 #     test_run.train_run("")
 
 </script>
+
+<attachment name="model_config_template">
+{
+  "outputs": [{
+    "name": "output",
+    "key": "output",
+    "type": "image",
+    "channels": ["SR"],
+    "size": 512,
+    "shape": [1, 512, 512, 1]
+  }],
+  "label": "Unet Model",
+  "model_name": "Unet_512x512",
+  "url": "",
+  "inputs": [{
+    "name": "input",
+    "key": "input",
+    "type": "image",
+    "channels": ["SR", "LR"],
+    "size": 512,
+    "shape": [1, 512, 512, 2],
+    "default": 0.0,
+    "required": true,
+    "hide": false
+  }]
+}
+
+</attachment>

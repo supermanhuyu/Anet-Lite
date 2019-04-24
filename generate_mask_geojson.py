@@ -2,8 +2,10 @@
 # convert geojson from masks
 import os
 from skimage import io
-import segmentationUtils
-import annotationUtils
+# import segmentationUtils
+# import annotationUtils
+from imgseg import segmentationUtils
+from imgseg import annotationUtils
 from geojson import FeatureCollection, dump
 from skimage import measure
 
@@ -128,11 +130,11 @@ def masks_to_annotation(outputs_dir):
             # print(mask_img[0:1, :100])
 
             # Call function to transform segmentation masks into (geojson) polygons
-            features, contours = segmentationUtils.masks_to_polygon(mask,
-                                                                    features=features,
+            feature, contours = segmentationUtils.masks_to_polygon(mask,
                                                                     label=label,
                                                                     simplify_tol=simplify_tol)
                                                                     # save_name=file_full.replace(".png", ".json"))
+            features.append(feature)
 
         feature_collection = FeatureCollection(features, bbox=[0, 0.0, image_size[0], image_size[1]])
 
@@ -145,16 +147,16 @@ def masks_to_annotation(outputs_dir):
 
 if __name__ == "__main__":
     print(os.getcwd())
-    # # generate mask from annotation.json
-    # files_proc = ["datasets/anet_png/train/w1_bac_kif1c_6512_p02_/annotation.json"]
-    # gen_mask_from_geojson(files_proc=files_proc)
+    # generate mask from annotation.json
+    files_proc = ["datasets/anet_png/train/w1_bac_kif1c_6512_p02_/annotation.json"]
+    gen_mask_from_geojson(files_proc=files_proc)
 
-    # generate mask from prediction.json
-    files_proc = ["datasets/anet_png/test/w11_bac_bora_4437_p14_/prediction.json"]
-    # files_proc = ["datasets/anet_png/test/w11_bac_bora_4437_p14_/annotation.json"]
-    # gen_mask_from_geojson(files_proc=files_proc, infer=True)
-    gen_mask_from_geojson(files_proc=files_proc, infer=False)
-
-
-    # outputs_dir = 'datasets/anet_png/test/w11_bac_bora_4437_p14_/'
-    # masks_to_annotation(outputs_dir)
+    # # generate mask from prediction.json
+    # files_proc = ["datasets/anet_png/test/w11_bac_bora_4437_p14_/prediction.json"]
+    # # files_proc = ["datasets/anet_png/test/w11_bac_bora_4437_p14_/annotation.json"]
+    # # gen_mask_from_geojson(files_proc=files_proc, infer=True)
+    # gen_mask_from_geojson(files_proc=files_proc, infer=False)
+    #
+    #
+    # # outputs_dir = 'datasets/anet_png/test/w11_bac_bora_4437_p14_/'
+    # # masks_to_annotation(outputs_dir)
