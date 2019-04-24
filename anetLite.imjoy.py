@@ -32,9 +32,7 @@ abort = threading.Event()
 def plot_tensors(dash, tensor_list, label, titles):
     image_list = [tensor.reshape(tensor.shape[-3], tensor.shape[-2], -1) for tensor in tensor_list]
     displays = {}
-    def stop():
-        api.alert('stopped')
-        abort.set()
+
     for i in range(len(image_list)):
         ims = image_list[i]
         for j in range(ims.shape[2]):

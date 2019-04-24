@@ -119,8 +119,8 @@ class GeojsonImporter(AnnotationImporter):
 
         # Overwrite default file size if bounding box is present
         if 'bbox' in data_json:
-            self.image_size = (int(data_json['bbox'][2]-data_json['bbox'][0]+1),
-                               int(data_json['bbox'][3]-data_json['bbox'][1]+1))
+            self.image_size = (int(data_json['bbox'][2]-data_json['bbox'][0]),
+                               int(data_json['bbox'][3]-data_json['bbox'][1]))
 
 
         # Loop over list and create simple dictionary & get size of annotations

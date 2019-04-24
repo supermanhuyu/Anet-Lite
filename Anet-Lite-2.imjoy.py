@@ -43,10 +43,6 @@ def plot_tensors(dash, tensor_list, label, titles):
     image_list = [tensor.reshape(tensor.shape[-3], tensor.shape[-2], -1) for tensor in tensor_list]
     displays = {}
 
-    def stop():
-        api.alert('stopped')
-        abort.set()
-
     for i in range(len(image_list)):
         ims = image_list[i]
         for j in range(ims.shape[2]):
@@ -117,25 +113,26 @@ class my_config():
         self.steps = steps
         self.batchsize = batchsize
 
-def my_opt(config, mask_config):
-    work_dir = os.path.join("datasets", config["samples"][0]["data"][0].split("/")[2])
+def my_opt(config):
+    # work_dir = os.path.join("datasets", config["samples"][0]["data"][0].split("/")[2])
+    if config["root_folder"].startswith("/"):
+        work_dir = "datasets" + config["root_folder"]
+    else:
+        work_dir = config["root_folder"]
     opt = Options().parse(['--work_dir={}'.format(work_dir)])
-    # self.work_dir = os.path.join("datasets", config["samples"][0]["data"][0].split("/")[2])
     opt.work_dir = work_dir
     opt.input_size = 256
-    opt.base_filter = 16
+    opt.base_filter = 4
     opt.input_channels = []
     opt.target_channels = []
     # opt.load_from = None
     # opt.checkpoints_dir = opt.work_dir + "/__model__"
 
-    opt.channel = config["channel"]
-    for name, filter_c in opt.channel.items():
-        opt.input_channels.append((name, {'filter': "*"+filter_c+"*", 'loader': ImageLoader()},))
-
-    opt.channel = mask_config["channel"]
-    for name, filter_c in opt.channel.items():
-        opt.target_channels.append((name, {'filter': "*"+filter_c+"*", 'loader': ImageLoader()},))
+    opt.channel = config["channels"]
+    for channel in opt.channel:
+        opt.input_channels.append((channel["name"], {'filter': "*"+channel["filter"]+"*", 'loader': ImageLoader()},))
+        opt.target_channels.append((channel["name"]+"_filled", {'filter': "*"+channel["name"]+"_filled*", 'loader': ImageLoader()},))
+        opt.target_channels.append((channel["name"]+"_distmap", {'filter': "*"+channel["name"]+"_distmap*", 'loader': ImageLoader()},))
 
     opt.input_nc = len(opt.input_channels)
     opt.target_nc = len(opt.target_channels)
@@ -305,7 +302,6 @@ class ImJoyPlugin():
         self._opt.work_dir = target_dir
 
     def initialize(self, opt):
-        # opt.work_dir = '{}/unet_data/train'.format(os.getcwd())
         self.model = UnetGenerator(input_size=opt.input_size, input_channels=opt.input_nc,
                                    target_channels=opt.target_nc, base_filter=opt.base_filter)
         if opt.load_from is not None:
@@ -368,6 +364,7 @@ class ImJoyPlugin():
 
     async def run(self, my):
         await self.train_run("")
+        pass
 
     async def test(self, my):
         if not self._initialized:
@@ -442,8 +439,7 @@ class ImJoyPlugin():
             json.dump(model_config, f)
 
     async def train_run(self, my):
-        json_path = "datasets/anet_png/config.json"
-        # json_path = "datasets/example/config.json"
+        json_path = "datasets/home/anet_png/config.json"
         print("json_path:", json_path)
 
         with open(json_path, "r") as f:
@@ -452,15 +448,14 @@ class ImJoyPlugin():
         print("config_json:", config_json)
         # await self.get_data_by_config(config=config_json)
         # self.get_mask_by_json(config=config_json)
-        config_mask = {"channel": {}}
-        for chan in config_json["channel"].keys():
-            config_mask["channel"][chan+"_filled"] = chan+"_filled"
 
-        self._opt = my_opt(config_json, config_mask)
+        self._opt = my_opt(config_json)
         self.initialize(self._opt)
         print("self._opt.work_dir:", self._opt.work_dir)
         print("self._opt.input_channels:", self._opt.input_channels)
         print("self._opt.target_channels:", self._opt.target_channels)
+        print("self._opt.input_nc:", self._opt.input_nc)
+        print("self._opt.target_nc:", self._opt.target_nc)
 
         config = my_config()
         print("config.name:", config.name)
@@ -468,18 +463,45 @@ class ImJoyPlugin():
         print("config.steps:", config.steps)
         print("config.batchsize:", config.batchsize)
 
+        # if no valid copy train as valid
         if not os.path.exists(os.path.join(self._opt.work_dir, "valid")):
-            # copy train dir as valid dir
             shutil.copytree(os.path.join(self._opt.work_dir, "train"), os.path.join(self._opt.work_dir, "valid"))
+
         await self.train_2(config)
 
         pass
 
     async def test_run(self, my):
-        samples = os.listdir(os.path.join(self._opt.work_dir, "test"))
+        if self._initialized:
+            samples = os.listdir(os.path.join(self._opt.work_dir, "test"))
+        else:
+            json_path = "datasets/home/anet_png/config.json"
+            print("json_path:", json_path)
 
-        sample_path = {"samples": samples[:1]}
+            with open(json_path, "r") as f:
+                json_content =f.read()
+            config_json = json.loads(json_content)
+            print("config_json:", config_json)
+            # await self.get_data_by_config(config=config_json)
+            # self.get_mask_by_json(config=config_json)
+
+            self._opt = my_opt(config_json)
+            self._opt.load_from = "datasets/home/anet_png/__model__/__model__.hdf5"
+            self.initialize(self._opt)
+
+            # self.model = load_model("datasets/home/anet_png/__model__/__model__.hdf5")
+            print("self._opt.work_dir:", self._opt.work_dir)
+            print("self._opt.input_channels:", self._opt.input_channels)
+            print("self._opt.target_channels:", self._opt.target_channels)
+            print("self._opt.input_nc:", self._opt.input_nc)
+            print("self._opt.target_nc:", self._opt.target_nc)
+
+            samples = os.listdir(os.path.join(self._opt.work_dir, "test"))
+            self._initialized = True
+
+        sample_path = {"samples": [os.path.join(self._opt.work_dir, "test", samples[0])]}
         await self.auto_test(samples=sample_path)
+        # await self.auto_test_2()
         pass
 
     async def train_2(self, config):
@@ -517,23 +539,20 @@ class ImJoyPlugin():
 
     async def auto_train(self, configPath):
         print("configPath:", configPath)
-        # await self.fs_readfile(configPath["configPath"])
         json_path = configPath["configPath"].replace(self.br_dir, "datasets")
         json_content = await self.readFile(configPath["configPath"])
         if not os.path.exists(os.path.dirname(json_path)):
             os.makedirs(os.path.dirname(json_path))
         with open(json_path, "w") as f:
             f.write(json_content)
+
         config_json = json.loads(json_content)
         print("config_json:", config_json)
+
         await self.get_data_by_config(config=config_json)
         self.get_mask_by_json(config=config_json)
-        config_mask = {"channel": {}}
-        for chan in config_json["channel"].keys():
-            config_mask["channel"][chan+"_filled"] = chan+"_filled"
 
-
-        self._opt = my_opt(config_json, config_mask)
+        self._opt = my_opt(config_json)
         self.initialize(self._opt)
         # print("self._opt.work_dir:", self._opt.work_dir)
         # print("self._opt.input_channels:", self._opt.input_channels)
@@ -554,7 +573,8 @@ class ImJoyPlugin():
         x, path = [], []
         count = 0
         for d in source:
-            # print("d['path']:", d['path'])
+            print("d['path']:", d['path'])
+            print("sample_path:", sample_path)
             if d['path'] == sample_path:
                 print("d['path']:", d['path'])
                 x.append(d['A'])
@@ -578,11 +598,10 @@ class ImJoyPlugin():
         batch_size = 1
         source = sources['test']
         count = 0
-        # output_dir = os.path.join(self._opt.work_dir, 'outputs')
-        # if not os.path.exists(output_dir):
-        #     os.makedirs(output_dir)
-        print("start run cus_make_test_generator ...")
+
+        # print("start run cus_make_test_generator ...")
         gen = self.cus_make_test_generator(source, sample_path)
+        # gen = make_test_generator(source)
         api.showStatus('making predictions.')
         totalsize = len(source)
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Anet-lite Prediction", w=25, h=10,
@@ -613,41 +632,100 @@ class ImJoyPlugin():
         # mask_file = os.path.join(sample_path, output_channels[0] + '.png')
         # save_name = os.path.join(sample_path, 'annotation_MASK.json')
         annotation_string = json.dumps(masks_to_annotation(sample_path))
-        return annotation_string
+        # return annotation_string
+
+    async def auto_test_2(self):
+        if not self._initialized:
+            api.alert('Please click `Anet-Lite` before testing.')
+            return
+        sources = GenericTransformedImages(self._opt)
+        batch_size = 1
+        source = sources['test']
+        count = 0
+
+        gen = make_test_generator(source)
+        api.showStatus('making predictions.')
+        totalsize = len(source)
+        self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Anet-lite Prediction", w=25, h=10,
+                                           data={"display_mode": "all"})
+
+        input_channels = [ch[0] for ch in self._opt.input_channels]
+        output_channels = [ch[0] + '_output' for ch in self._opt.target_channels]
+
+        titles = [input_channels, output_channels]
+        print("titles:", titles)
+        for j in range(int(totalsize/batch_size+0.5)):
+            xbatch, paths = next(gen)
+            ypbatch = self.model.predict(xbatch, batch_size=batch_size)
+            tensor_list = [xbatch, ypbatch]
+            label = 'Sample '+ str(j)
+            titles = [input_channels, output_channels]
+            plot_tensors(self.dash, tensor_list, label, titles)
+            count +=batch_size
+            for b in range(len(ypbatch)):
+                image = ypbatch[b]
+                path = paths[b]
+                print("path:", path)
+
+                for i in range(image.shape[2]):
+                    print("output_channels[i]:", output_channels[i])
+                    misc.imsave(os.path.join(path, output_channels[i] + '.png'),
+                                image[:, :, i].astype('float32'))
+                annotation_string = json.dumps(masks_to_annotation(path))
+                # return annotation_string
+
+            api.showProgress(1.0*count/totalsize)
+            api.showStatus('making predictions: {}/{}'.format(count, totalsize))
 
     async def get_data_by_config(self, config):
+        if config["root_folder"].startswith("/"):
+            work_dir = "datasets" + config["root_folder"]
+        else:
+            work_dir = config["root_folder"]
+
         samples = config["samples"]
         for sample in samples:
-
-            # save annotation file
-            sample_annotation = sample["annotation"]
-            saved_dir = os.path.dirname(sample_annotation).replace(self.br_dir, "datasets")
+            saved_dir = os.path.join(work_dir, sample["group"], sample["name"])
             if not os.path.exists(saved_dir):
                 os.makedirs(saved_dir)
-            saved_path = sample_annotation.replace(self.br_dir, "datasets")
-            anno_content = await self.readFile(sample_annotation)
-            with open(saved_path, "w") as f:
+
+            # save annotation file
+            anno_fs_path = os.path.join(config["root_folder"], sample["group"], sample["name"], sample["annotation"])
+            anno_path = os.path.join(work_dir, sample["group"], sample["name"], sample["annotation"])
+            anno_content = await self.readFile(anno_fs_path)
+            with open(anno_path, "w") as f:
                 f.write(anno_content)
+            # print("anno_fs_path:", anno_fs_path)
+            # print("anno_path:", anno_path)
 
             # save img file
             sample_data = sample["data"]
-            for file in sample_data:
-                file_content = await self.readFile(file)
-                file_path = file.replace(self.br_dir, "datasets")
-                if file_path.endswith(".png.base64"):
-                    file_path = file_path.replace(".png.base64", ".png")
+            for file_dic in sample_data:
+                file_fs_path = os.path.join(config["root_folder"], sample["group"], sample["name"], file_dic["name"])
+                file_path = os.path.join(work_dir, sample["group"], sample["name"], file_dic["name"])
+                file_content = await self.readFile(file_fs_path)
+                if file_path.endswith(".base64"):
+                    file_path = file_path.replace(".base64", "")
                     with open(file_path, "wb") as f:
                         f.write(bytes(base64.b64decode(file_content.replace("data:image/png;base64,", ""))))
                 else:
                     with open(file_path, "w") as f:
                         f.write(file_content)
+                # print("file_fs_path:", file_fs_path)
+                # print("file_path:", file_path)
 
     def get_mask_by_json(self, config):
+        if config["root_folder"].startswith("/"):
+            work_dir = "datasets" + config["root_folder"]
+        else:
+            work_dir = config["root_folder"]
+
         samples = config["samples"]
         for sample in samples:
-            sample_annotation = sample["annotation"].replace(self.br_dir, "datasets")
-            print(sample_annotation)
-            gen_mask_from_geojson(files_proc=[sample_annotation])
+            # annotation path
+            anno_path = os.path.join(work_dir, sample["group"], sample["name"], sample["annotation"])
+            print("anno_path:", anno_path)
+            gen_mask_from_geojson(files_proc=[anno_path])
         return True
         pass
 
