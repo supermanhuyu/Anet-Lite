@@ -83,7 +83,7 @@ Once done, the result will be saved automatically into the testing folder.
 {
   "name": "Anet-Lite",
   "type": "native-python",
-  "version": "0.2.6",
+  "version": "0.2.9",
   "api_version": "0.1.3",
   "description": "A generic plugin for image-to-image translation with A-net.",
   "tags": ["CPU", "GPU", "Windows-CPU", "Window-GPU"],
@@ -245,8 +245,15 @@ def my_opt(config):
     opt.channel = config["channels"]
     for channel in opt.channel:
         opt.input_channels.append((channel["name"], {'filter': "*"+channel["filter"]+"*", 'loader': ImageLoader()},))
-        opt.target_channels.append((channel["name"]+"_filled", {'filter': "*"+channel["name"]+"_filled*", 'loader': ImageLoader()},))
-        opt.target_channels.append((channel["name"]+"_distmap", {'filter': "*"+channel["name"]+"_distmap*", 'loader': ImageLoader()},))
+
+    try:
+        annotation_types = config.get("annotation_types")
+        for anno_type in annotation_types:
+            anno_type.get("label")
+            opt.target_channels.append((anno_type.get("label")+"_filled", {'filter': "*"+anno_type.get("label")+"_filled*", 'loader': ImageLoader()},))
+            opt.target_channels.append((anno_type.get("label")+"_distmap", {'filter': "*"+anno_type.get("label")+"_distmap*", 'loader': ImageLoader()},))
+    except:
+        pass
 
     opt.input_nc = len(opt.input_channels)
     opt.target_nc = len(opt.target_channels)
@@ -285,9 +292,9 @@ def gen_mask_from_geojson(files_proc, img_size=None, infer=False):
         file_base, ext = os.path.splitext(file)
 
         # Read annotation:  Correct class has been selected based on annot_type
-        annot_dict_all, roi_size_all, image_size = annotationsImporter.load(file_proc)
-        if img_size is not None:
-            image_size = img_size
+        annot_dict_all, roi_size_all, _ = annotationsImporter.load(file_proc)
+        # if img_size is not None:
+        #     image_size = img_size
 
         annot_types = set(annot_dict_all[k]['properties']['label'] for k in annot_dict_all.keys())
         print("annot_types: ", annot_types)
@@ -298,12 +305,14 @@ def gen_mask_from_geojson(files_proc, img_size=None, infer=False):
 
             # Filter the annotations by label
             annot_dict = {k: annot_dict_all[k] for k in annot_dict_all.keys() if annot_dict_all[k]['properties']['label'] == annot_type}
+            print("len(annot_dict):", len(annot_dict))
+            print("annot_dict.keys():", annot_dict.keys())
 
             # Create masks
 
             # Binary - is always necessary to creat other masks
             print(' .... creating binary masks .....')
-            binaryMasks = annotationUtils.BinaryMaskGenerator(image_size=image_size, erose_size=5, obj_size_rem=500, save_indiv=True)
+            binaryMasks = annotationUtils.BinaryMaskGenerator(image_size=img_size, erose_size=5, obj_size_rem=500, save_indiv=True)
             mask_dict = binaryMasks.generate(annot_dict)
 
             # Save binary masks FILLED if specified
@@ -392,7 +401,6 @@ def masks_to_annotation(outputs_dir):
 class ImJoyPlugin():
     def __init__(self):
         self._initialized = False
-        self.br_dir = "/home"
 
     def download_data(self, my):
         if not self._initialized:
@@ -553,7 +561,8 @@ class ImJoyPlugin():
             json.dump(model_config, f)
 
     async def train_run(self, my):
-        json_path = "datasets/home/anet_png/config.json"
+        # json_path = "datasets/home/anet_png/config.json"
+        json_path = "datasets/home/example/config.json"
         print("json_path:", json_path)
 
         with open(json_path, "r") as f:
@@ -653,12 +662,13 @@ class ImJoyPlugin():
 
     async def auto_train(self, configPath):
         print("configPath:", configPath)
-        json_path = configPath["configPath"].replace(self.br_dir, "datasets")
+        json_path = "datasets" + configPath["configPath"]
         json_content = await self.readFile(configPath["configPath"])
         if not os.path.exists(os.path.dirname(json_path)):
             os.makedirs(os.path.dirname(json_path))
         with open(json_path, "w") as f:
             f.write(json_content)
+            print("config.json save to path :", json_path)
 
         config_json = json.loads(json_content)
         print("config_json:", config_json)
@@ -668,15 +678,17 @@ class ImJoyPlugin():
 
         self._opt = my_opt(config_json)
         self.initialize(self._opt)
-        # print("self._opt.work_dir:", self._opt.work_dir)
-        # print("self._opt.input_channels:", self._opt.input_channels)
-        # print("self._opt.target_channels:", self._opt.target_channels)
+        print("self._opt.work_dir:", self._opt.work_dir)
+        print("self._opt.input_channels:", self._opt.input_channels)
+        print("self._opt.target_channels:", self._opt.target_channels)
+        print("self._opt.input_nc:", self._opt.input_nc)
+        print("self._opt.target_nc:", self._opt.target_nc)
 
         config = my_config()
-        # print("config.name:", config.name)
-        # print("config.epochs:", config.epochs)
-        # print("config.steps:", config.steps)
-        # print("config.batchsize:", config.batchsize)
+        print("config.name:", config.name)
+        print("config.epochs:", config.epochs)
+        print("config.steps:", config.steps)
+        print("config.batchsize:", config.batchsize)
 
         if not os.path.exists(os.path.join(self._opt.work_dir, "valid")):
             # copy train dir as valid dir
@@ -746,6 +758,10 @@ class ImJoyPlugin():
         # mask_file = os.path.join(sample_path, output_channels[0] + '.png')
         # save_name = os.path.join(sample_path, 'annotation_MASK.json')
         annotation_string = json.dumps(masks_to_annotation(sample_path))
+        try:
+            await self.writeFile(sample_path.replace("datasets", ""), annotation_string)
+        except:
+            print("write data to file: {} error.".format(sample_path.replace("datasets", "")))
         # return annotation_string
 
     async def auto_test_2(self):
@@ -806,9 +822,12 @@ class ImJoyPlugin():
             # save annotation file
             anno_fs_path = os.path.join(config["root_folder"], sample["group"], sample["name"], sample["annotation"])
             anno_path = os.path.join(work_dir, sample["group"], sample["name"], sample["annotation"])
-            anno_content = await self.readFile(anno_fs_path)
-            with open(anno_path, "w") as f:
-                f.write(anno_content)
+            try:
+                anno_content = await self.readFile(anno_fs_path)
+                with open(anno_path, "w") as f:
+                    f.write(anno_content)
+            except:
+                print("warnming: can not get the file :", anno_fs_path)
             # print("anno_fs_path:", anno_fs_path)
             # print("anno_path:", anno_path)
 
@@ -817,16 +836,19 @@ class ImJoyPlugin():
             for file_dic in sample_data:
                 file_fs_path = os.path.join(config["root_folder"], sample["group"], sample["name"], file_dic["name"])
                 file_path = os.path.join(work_dir, sample["group"], sample["name"], file_dic["name"])
-                file_content = await self.readFile(file_fs_path)
-                if file_path.endswith(".base64"):
-                    file_path = file_path.replace(".base64", "")
-                    with open(file_path, "wb") as f:
-                        f.write(bytes(base64.b64decode(file_content.replace("data:image/png;base64,", ""))))
-                else:
-                    with open(file_path, "w") as f:
-                        f.write(file_content)
-                # print("file_fs_path:", file_fs_path)
-                # print("file_path:", file_path)
+                try:
+                    file_content = await self.readFile(file_fs_path)
+                    if file_path.endswith(".base64"):
+                        file_path = file_path.replace(".base64", "")
+                        with open(file_path, "wb") as f:
+                            f.write(bytes(base64.b64decode(file_content.replace("data:image/png;base64,", ""))))
+                    else:
+                        with open(file_path, "w") as f:
+                            f.write(file_content)
+                    # print("file_fs_path:", file_fs_path)
+                    # print("file_path:", file_path)
+                except:
+                    print("warnming: can not get the file :", file_fs_path)
 
     def get_mask_by_json(self, config):
         if config["root_folder"].startswith("/"):
@@ -835,11 +857,20 @@ class ImJoyPlugin():
             work_dir = config["root_folder"]
 
         samples = config["samples"]
+        anno_path_list = []
         for sample in samples:
-            # annotation path
-            anno_path = os.path.join(work_dir, sample["group"], sample["name"], sample["annotation"])
+            try:
+                anno_name = sample.get("annotation")
+            except:
+                anno_name = "annotation.json"
+                # annotation path
+            anno_path = os.path.join(work_dir, sample["group"], sample["name"], anno_name)
             print("anno_path:", anno_path)
-            gen_mask_from_geojson(files_proc=[anno_path])
+            anno_path_list.append(anno_path)
+        size_file  = os.path.join(work_dir, samples[0]["group"], samples[0]["name"], samples[0]["data"][0]["name"].replace(".base64", ""))
+        mask_img = io.imread(size_file)
+        print("mask_img.shape:", mask_img.shape)
+        gen_mask_from_geojson(files_proc=anno_path_list, img_size=(624, 924))
         return True
         pass
 
@@ -856,9 +887,8 @@ class ImJoyPlugin():
         return fut
 
     def fs_readfile(self, path):
-        saved_dir = os.path.dirname(path).replace(self.br_dir, "datasets")
-        saved_path = path.replace(self.br_dir, "datasets")
-
+        saved_dir = "datasets" + os.path.dirname(path)
+        saved_path = "datasets" +  path
         if not os.path.exists(saved_dir):
             os.makedirs(saved_dir)
 
@@ -882,6 +912,20 @@ class ImJoyPlugin():
             fut.set_result(png_saved_path)
 
         api.fs.readFile(path, 'utf8', cb)
+        return fut
+
+    def writeFile(self, path, file_data):
+        loop = asyncio.get_event_loop()
+        fut = loop.create_future()
+
+        def read(err, data=None):
+            if err:
+                print(err)
+                return
+
+            fut.set_result(path)
+
+        api.fs.writeFile(path, file_data, read)
         return fut
 
     async def freeze_model(self, my):
