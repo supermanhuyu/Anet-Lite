@@ -638,20 +638,20 @@ class ImJoyPlugin():
 #     }
 #   ]
 # }
-#         network_config = {
-#           "api_version": "0.1.3",
-#           "channel_config": config_json.get("channel_config"),
-#           "annotation_types": config_json.get("annotation_types"),
-#           "network_types": [{"type": "unet"}],
-#           "post_processing_types": [{"name": "withseed", "type": "withseed"},
-#                                     {"name": "seedless", "type": "seedless",
-#                                      "options": [{"type": "string","name": "seed"}]}],
-#           "loss_types": [{"type": "mse"},
-#                          {"type": "cross entropy"}]
-#         }
-#         await api.createWindow(type="NetworkConfig",
-#                                data={"finish_callback": "finish_config_callback",
-#                                      "config": network_config})
+        network_config = {
+          "api_version": "0.1.3",
+          "channel_config": config_json.get("channel_config"),
+          "annotation_types": config_json.get("annotation_types"),
+          "network_types": [{"type": "unet"}],
+          "post_processing_types": [{"name": "withseed", "type": "withseed"},
+                                    {"name": "seedless", "type": "seedless",
+                                     "options": [{"type": "string","name": "seed"}]}],
+          "loss_types": [{"type": "mse"},
+                         {"type": "cross entropy"}]
+        }
+        # await api.createWindow(type="NetworkConfig",
+        #                        data={"finish_callback": "finish_config_callback",
+        #                              "config": network_config})
         await self.train_2(config)
 
     async def finish_config_callback(self, config):
@@ -725,13 +725,19 @@ class ImJoyPlugin():
         # save_name = os.path.join(sample_path, 'annotation_MASK.json')
         annotation_string = json.dumps(masks_to_annotation(sample_path))
         fs_path = sample_path.replace("datasets", "")
-        # fs_path = "/tmp/prediction.json"
+        fs_path = "/tmp/prediction.json"
         print("save prediction.json to browser fs_path:", fs_path)
         try:
             await self.writeFile(fs_path, annotation_string)
-            return fs_path
+            # return fs_path
         except:
             print("write data to file: {} error.".format(sample_path.replace("datasets", "")))
+
+        # file_content = await self.readFile(fs_path)
+        # # print("file_content:", file_content)
+        # with open(fs_path, "w") as f:
+        #     f.write(file_content)
+
         # return annotation_string
 
     async def auto_test_2(self):
