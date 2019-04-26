@@ -32,6 +32,7 @@ from anet.networks import UnetGenerator, get_dssim_l1_loss
 from anet.utils import export_model_to_js
 from imgseg import segmentationUtils
 from imgseg import annotationUtils
+from imgseg import DRFNStoolbox
 
 # import importlib
 # importlib.reload(UnetGenerator)
@@ -187,13 +188,13 @@ def gen_mask_from_geojson(files_proc, img_size=None, infer=False):
         print("annot_types: ", annot_types)
 
         for annot_type in annot_types:
-            print("annot_type: ", annot_type)
+            # print("annot_type: ", annot_type)
             masks_to_create[annot_type] = masks_to_create_value
 
             # Filter the annotations by label
             annot_dict = {k: annot_dict_all[k] for k in annot_dict_all.keys() if annot_dict_all[k]['properties']['label'] == annot_type}
-            print("len(annot_dict):", len(annot_dict))
-            print("annot_dict.keys():", annot_dict.keys())
+            # print("len(annot_dict):", len(annot_dict))
+            # print("annot_dict.keys():", annot_dict.keys())
 
             # Create masks
 
@@ -245,14 +246,14 @@ def gen_mask_from_geojson(files_proc, img_size=None, infer=False):
 
 def masks_to_annotation(outputs_dir):
     # %% Process one folder and save as one json file allowing multiple annotation types
-    simplify_tol = 1  # Tolerance for polygon simplification with shapely (0 to not simplify)
+    simplify_tol = 0  # Tolerance for polygon simplification with shapely (0 to not simplify)
 
     # outputs_dir = os.path.abspath(os.path.join('..', 'data', 'postProcessing', 'mask2json'))
     if os.path.exists(outputs_dir):
         print(f'Analyzing folder:{outputs_dir}')
         features = []  # For geojson
         image_size = None
-        for file in [f for f in os.listdir(outputs_dir) if '_filled_output.png' in f]:
+        for file in [f for f in os.listdir(outputs_dir) if '_distmap_output.png' in f]:
             # Read png with mask
             print(f'Analyzing file:{file}')
 
@@ -260,18 +261,24 @@ def masks_to_annotation(outputs_dir):
             mask_img = io.imread(file_full)
             print("mask_img.shape:", mask_img.shape)
             mask = measure.label(mask_img)
-            # mask = mask_img
+            nuclei_mask = DRFNStoolbox.seedless_segment(mask, 15, p_thresh=0.5)
+            img = Image.fromarray(nuclei_mask.astype('uint8'))
+            img.save(os.path.join(outputs_dir, file.replace('.png', '_noSeeds_OBJECTS.png')))
+
+            cell_mask = DRFNStoolbox.segment_with_seed(mask, nuclei_mask, 15, p_thresh=0.5)
+            img = Image.fromarray(cell_mask.astype('uint8'))
+            img.save(os.path.join(outputs_dir, file.replace('.png', '_wSeeds_OBJECTS.png')))
 
             # Here summarizing the geojson should occur
             image_size = mask_img.shape  # This might cause problems if any kind of binning was performed
 
             # Get label from file name
-            label = file.split('_filled_output.png', 1)[0]
+            label = file.split('_distmap_output.png', 1)[0]
             print("label:", label)
             # print(mask_img[0:1, :100])
 
             # Call function to transform segmentation masks into (geojson) polygons
-            feature, contours = segmentationUtils.masks_to_polygon(mask,
+            feature, contours = segmentationUtils.masks_to_polygon(cell_mask,
                                                                     label=label,
                                                                     simplify_tol=simplify_tol)
                                                                     # save_name=file_full.replace(".png", ".json"))
@@ -283,7 +290,7 @@ def masks_to_annotation(outputs_dir):
         with open(save_name_json, 'w') as f:
             dump(feature_collection, f)
             f.close()
-
+        return feature_collection
 
 class ImJoyPlugin():
     def __init__(self):
@@ -457,7 +464,7 @@ class ImJoyPlugin():
         config_json = json.loads(json_content)
         print("config_json:", config_json)
         # await self.get_data_by_config(config=config_json)
-        # self.get_mask_by_json(config=config_json)
+        self.get_mask_by_json(config=config_json)
 
         self._opt = my_opt(config_json)
         self.initialize(self._opt)
@@ -578,7 +585,81 @@ class ImJoyPlugin():
         if not os.path.exists(os.path.join(self._opt.work_dir, "valid")):
             # copy train dir as valid dir
             shutil.copytree(os.path.join(self._opt.work_dir, "train"), os.path.join(self._opt.work_dir, "valid"))
+#         network_config = {
+#   "api_version": "0.1.3",
+#   "channel_config": {
+#     "002": {
+#       "filter": "c002",
+#       "name": "c002"
+#     },
+#     "007": {
+#       "filter": "c007",
+#       "name": "c007"
+#     }
+#   },
+#   "annotation_types": {
+#     "cell": {
+#       "label": "cell",
+#       "color": "#ff0000",
+#       "line_width": 4,
+#       "type": "Polygon"
+#     },
+#     "44444": {
+#       "label": "44444",
+#       "color": "#009688",
+#       "line_width": 4,
+#       "type": "LineString"
+#     }
+#   },
+#   "network_types": [
+#     {
+#       "type": "unet"
+#     }
+#   ],
+#   "post_processing_types": [
+#     {
+#       "name": "withseed",
+#       "type": "withseed"
+#     },
+#     {
+#       "name": "seedless",
+#       "type": "seedless",
+#       "options": [
+#         {
+#           "type": "string",
+#           "name": "seed"
+#         }
+#       ]
+#     }
+#   ],
+#   "loss_types": [
+#     {
+#       "type": "mse"
+#     }
+#   ]
+# }
+#         network_config = {
+#           "api_version": "0.1.3",
+#           "channel_config": config_json.get("channel_config"),
+#           "annotation_types": config_json.get("annotation_types"),
+#           "network_types": [{"type": "unet"}],
+#           "post_processing_types": [{"name": "withseed", "type": "withseed"},
+#                                     {"name": "seedless", "type": "seedless",
+#                                      "options": [{"type": "string","name": "seed"}]}],
+#           "loss_types": [{"type": "mse"},
+#                          {"type": "cross entropy"}]
+#         }
+#         await api.createWindow(type="NetworkConfig",
+#                                data={"finish_callback": "finish_config_callback",
+#                                      "config": network_config})
         await self.train_2(config)
+
+    async def finish_config_callback(self, config):
+        await print("config:", config)
+        # inputs = config.inputs
+        # targets = config.targets
+        # post_processing = config.post_processing
+        # await self.train_2(config)
 
     def cus_make_test_generator(self, source, sample_path, batch_size=1):
         x, path = [], []
@@ -644,6 +725,8 @@ class ImJoyPlugin():
         # save_name = os.path.join(sample_path, 'annotation_MASK.json')
         annotation_string = json.dumps(masks_to_annotation(sample_path))
         fs_path = sample_path.replace("datasets", "")
+        # fs_path = "/tmp/prediction.json"
+        print("save prediction.json to browser fs_path:", fs_path)
         try:
             await self.writeFile(fs_path, annotation_string)
             return fs_path
