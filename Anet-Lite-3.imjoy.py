@@ -461,57 +461,30 @@ class ImJoyPlugin():
 
         with open(json_path, "r") as f:
             json_content =f.read()
-        self.config_json = json.loads(json_content)
-        print("config_json:", self.config_json)
+        config_json = json.loads(json_content)
+        print("config_json:", config_json)
         # await self.get_data_by_config(config=config_json)
-        # self.get_mask_by_json(config=self.config_json)
+        self.get_mask_by_json(config=config_json)
 
-        # self._opt = my_opt(config_json)
-        # self.initialize(self._opt)
-        # print("self._opt.work_dir:", self._opt.work_dir)
-        # print("self._opt.input_channels:", self._opt.input_channels)
-        # print("self._opt.target_channels:", self._opt.target_channels)
-        # print("self._opt.input_nc:", self._opt.input_nc)
-        # print("self._opt.target_nc:", self._opt.target_nc)
-        #
-        # config = my_config()
-        # print("config.name:", config.name)
-        # print("config.epochs:", config.epochs)
-        # print("config.steps:", config.steps)
-        # print("config.batchsize:", config.batchsize)
-        #
-        # # if no valid copy train as valid
-        # if not os.path.exists(os.path.join(self._opt.work_dir, "valid")):
-        #     shutil.copytree(os.path.join(self._opt.work_dir, "train"), os.path.join(self._opt.work_dir, "valid"))
+        self._opt = my_opt(config_json)
+        self.initialize(self._opt)
+        print("self._opt.work_dir:", self._opt.work_dir)
+        print("self._opt.input_channels:", self._opt.input_channels)
+        print("self._opt.target_channels:", self._opt.target_channels)
+        print("self._opt.input_nc:", self._opt.input_nc)
+        print("self._opt.target_nc:", self._opt.target_nc)
 
-        network_config = {
-          "api_version": "0.1.3",
-          "channel_config": self.config_json.get("channel_config"),
-          "annotation_types": self.config_json.get("annotation_types"),
-          "post_processing_types": [{"name": "withseed", "type": "withseed"},
-                                    {"name": "seedless", "type": "seedless",
-                                     "options": [{"type": "string","name": "seed"}]}],
-          "loss_types": [{"type": "mse"},
-                         {"type": "cross entropy"}],
-          "target_types": [{"type": "channel"},
-                           {"type": "annotation"}],
-          "target_masks": [{"type": "filled"},
-                           {"type": "distmap"},
-                           {"type": "edge"},
-                           {"type": "weighted"}],
-          "network_types": [{"type": "Anet"},
-                            {"type": "Unet"}]}
+        config = my_config()
+        print("config.name:", config.name)
+        print("config.epochs:", config.epochs)
+        print("config.steps:", config.steps)
+        print("config.batchsize:", config.batchsize)
 
-        win = await api.createWindow({
-            "name": 'AnetConfig',
-            "type": 'AnetConfig',
-            "fullsize": True,
-            "data": {
-                "configJson": network_config,
-                "callback": self.finish_config_callback
-            }
-        })
-        # await self.train_2(config)
+        # if no valid copy train as valid
+        if not os.path.exists(os.path.join(self._opt.work_dir, "valid")):
+            shutil.copytree(os.path.join(self._opt.work_dir, "train"), os.path.join(self._opt.work_dir, "valid"))
+
+        await self.train_2(config)
         pass
 
     async def test_run(self, my):
@@ -554,7 +527,7 @@ class ImJoyPlugin():
 
         sources = GenericTransformedImages(opt)
         epochs = config.epochs
-        self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Anet-lite Training", fullsize=True,
+        self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Anet-lite Training", w=25, h=10,
                                            data={"display_mode": "all", 'metrics': ['mse', 'dssim_l1'],
                                                  'callbacks': ['onStep']})
         updateUI = UpdateUI(epochs, self.dash, make_generator(sources['valid'], batch_size=1), opt)
@@ -589,29 +562,29 @@ class ImJoyPlugin():
             f.write(json_content)
             print("config.json save to path :", json_path)
 
-        self.config_json = json.loads(json_content)
-        print("config_json:", self.config_json)
+        config_json = json.loads(json_content)
+        print("config_json:", config_json)
 
-        await self.get_data_by_config(config=self.config_json)
-        # self.get_mask_by_json(config=config_json)
-        #
-        # self._opt = my_opt(config_json)
-        # self.initialize(self._opt)
-        # print("self._opt.work_dir:", self._opt.work_dir)
-        # print("self._opt.input_channels:", self._opt.input_channels)
-        # print("self._opt.target_channels:", self._opt.target_channels)
-        # print("self._opt.input_nc:", self._opt.input_nc)
-        # print("self._opt.target_nc:", self._opt.target_nc)
-        #
-        # config = my_config()
-        # print("config.name:", config.name)
-        # print("config.epochs:", config.epochs)
-        # print("config.steps:", config.steps)
-        # print("config.batchsize:", config.batchsize)
-        #
-        # if not os.path.exists(os.path.join(self._opt.work_dir, "valid")):
-        #     # copy train dir as valid dir
-        #     shutil.copytree(os.path.join(self._opt.work_dir, "train"), os.path.join(self._opt.work_dir, "valid"))
+        await self.get_data_by_config(config=config_json)
+        self.get_mask_by_json(config=config_json)
+
+        self._opt = my_opt(config_json)
+        self.initialize(self._opt)
+        print("self._opt.work_dir:", self._opt.work_dir)
+        print("self._opt.input_channels:", self._opt.input_channels)
+        print("self._opt.target_channels:", self._opt.target_channels)
+        print("self._opt.input_nc:", self._opt.input_nc)
+        print("self._opt.target_nc:", self._opt.target_nc)
+
+        config = my_config()
+        print("config.name:", config.name)
+        print("config.epochs:", config.epochs)
+        print("config.steps:", config.steps)
+        print("config.batchsize:", config.batchsize)
+
+        if not os.path.exists(os.path.join(self._opt.work_dir, "valid")):
+            # copy train dir as valid dir
+            shutil.copytree(os.path.join(self._opt.work_dir, "train"), os.path.join(self._opt.work_dir, "valid"))
 #         network_config = {
 #   "api_version": "0.1.3",
 #   "channel_config": {
@@ -667,67 +640,26 @@ class ImJoyPlugin():
 # }
         network_config = {
           "api_version": "0.1.3",
-          "channel_config": self.config_json.get("channel_config"),
-          "annotation_types": self.config_json.get("annotation_types"),
+          "channel_config": config_json.get("channel_config"),
+          "annotation_types": config_json.get("annotation_types"),
+          "network_types": [{"type": "unet"}],
           "post_processing_types": [{"name": "withseed", "type": "withseed"},
                                     {"name": "seedless", "type": "seedless",
                                      "options": [{"type": "string","name": "seed"}]}],
           "loss_types": [{"type": "mse"},
-                         {"type": "cross entropy"}],
-          "target_types": [{"type": "channel"},
-                           {"type": "annotation"}],
-          "target_masks": [{"type": "filled"},
-                           {"type": "distmap"},
-                           {"type": "edge"},
-                           {"type": "weighted"}],
-          "network_types": [{"type": "Anet"},
-                            {"type": "Unet"}]}
-
-        win = await api.createWindow({
-            "name": 'AnetConfig',
-            "type": 'AnetConfig',
-            "fullsize": True,
-            "data": {
-                "configJson": network_config,
-                "callback": self.finish_config_callback
-            }
-        })
-        # await self.train_2(config)
-
-    def update_config_json(self, back_config):
-        channel_config = self.config_json.get("channel_config")
-        back_config_inputs = back_config.get("inputs")
-        print("back_config_inputs:", back_config_inputs)
-        key_list = []
-        for key in channel_config.keys():
-            if key not in back_config.get("inputs"):
-                print("pop the input key:", key)
-                key_list.append(key)
-                # self.config_json.get("channel_config").pop(key)
-        for key in key_list:
-            self.config_json.get("channel_config").pop(key)
-        pass
-
-    async def finish_config_callback(self, back_config):
-        print("back_config:", back_config)
-        self.update_config_json(back_config)
-
-        self.get_mask_by_json(config=self.config_json)
-        self._opt = my_opt(self.config_json)
-        self.initialize(self._opt)
-        print("self._opt.work_dir:", self._opt.work_dir)
-        print("self._opt.input_channels:", self._opt.input_channels)
-        print("self._opt.target_channels:", self._opt.target_channels)
-        print("self._opt.input_nc:", self._opt.input_nc)
-        print("self._opt.target_nc:", self._opt.target_nc)
-
-        config = my_config()
-        print("config.name:", config.name)
-        print("config.epochs:", config.epochs)
-        print("config.steps:", config.steps)
-        print("config.batchsize:", config.batchsize)
-
+                         {"type": "cross entropy"}]
+        }
+        # await api.createWindow(type="NetworkConfig",
+        #                        data={"finish_callback": "finish_config_callback",
+        #                              "config": network_config})
         await self.train_2(config)
+
+    async def finish_config_callback(self, config):
+        await print("config:", config)
+        # inputs = config.inputs
+        # targets = config.targets
+        # post_processing = config.post_processing
+        # await self.train_2(config)
 
     def cus_make_test_generator(self, source, sample_path, batch_size=1):
         x, path = [], []
