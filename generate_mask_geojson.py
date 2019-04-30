@@ -54,6 +54,8 @@ def gen_mask_from_geojson(files_proc, img_size=None, infer=False):
 
             # Filter the annotations by label
             annot_dict = {k: annot_dict_all[k] for k in annot_dict_all.keys() if annot_dict_all[k]['properties']['label'] == annot_type}
+            # print("len(annot_dict):", len(annot_dict))
+            # print("annot_dict.keys():", annot_dict.keys())
 
             # Create masks
 
@@ -105,7 +107,7 @@ def gen_mask_from_geojson(files_proc, img_size=None, infer=False):
 
 def masks_to_annotation(outputs_dir):
     # %% Process one folder and save as one json file allowing multiple annotation types
-    simplify_tol = 1  # Tolerance for polygon simplification with shapely (0 to not simplify)
+    simplify_tol = 0  # Tolerance for polygon simplification with shapely (0 to not simplify)
 
     # outputs_dir = os.path.abspath(os.path.join('..', 'data', 'postProcessing', 'mask2json'))
     if os.path.exists(outputs_dir):
@@ -136,7 +138,11 @@ def masks_to_annotation(outputs_dir):
                                                                     label=label,
                                                                     simplify_tol=simplify_tol)
                                                                     # save_name=file_full.replace(".png", ".json"))
-            features.append(feature)
+            # features.append(feature)
+            features = features + feature
+            # feature_fix = feature
+            # feature_fix["geometry"]["coordinates"] = [feature[0]["geometry"]["coordinates"]]
+            # features.append(feature_fix)
         feature_collection = FeatureCollection(features, bbox=[0, 0.0, image_size[0], image_size[1]])
 
         # Save to json file
@@ -152,11 +158,11 @@ if __name__ == "__main__":
     # files_proc = ["datasets/anet_png/train/w1_bac_kif1c_6512_p02_/annotation.json"]
     # gen_mask_from_geojson(files_proc=files_proc)
 
-    # # generate mask from prediction.json
-    # files_proc = ["datasets/anet_png/test/w11_bac_bora_4437_p14_/prediction.json"]
-    # # files_proc = ["datasets/anet_png/test/w11_bac_bora_4437_p14_/annotation.json"]
-    # # gen_mask_from_geojson(files_proc=files_proc, infer=True)
-    # gen_mask_from_geojson(files_proc=files_proc, infer=False)
+    # generate mask from prediction.json
+    files_proc = ["datasets/anet_png_test/train/w1_bac_kif1c_6512_p02_/prediction.json"]
+    # files_proc = ["datasets/anet_png_test/train/w1_bac_kif1c_6512_p02_/annotation.json"]
+    # gen_mask_from_geojson(files_proc=files_proc, img_size=(2048, 2048), infer=True)
+    gen_mask_from_geojson(files_proc=files_proc, img_size=(2048, 2048), infer=False)
 
-    outputs_dir = 'datasets/home/example01/test/z018'
-    masks_to_annotation(outputs_dir)
+    # outputs_dir = 'datasets/anet_png_test/train/w1_bac_kif1c_6512_p02_'
+    # masks_to_annotation(outputs_dir)

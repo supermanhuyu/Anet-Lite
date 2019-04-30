@@ -119,8 +119,8 @@ class GeojsonImporter(AnnotationImporter):
 
         # Overwrite default file size if bounding box is present
         if 'bbox' in data_json:
-            self.image_size = (int(data_json['bbox'][2]-data_json['bbox'][0]),
-                               int(data_json['bbox'][3]-data_json['bbox'][1]))
+            self.image_size = (int(data_json['bbox'][2]-data_json['bbox'][0]+1),
+                               int(data_json['bbox'][3]-data_json['bbox'][1]+1))
 
 
         # Loop over list and create simple dictionary & get size of annotations
@@ -228,7 +228,7 @@ class BinaryMaskGenerator(MaskGenerator):
         self.erose_size = erose_size
         self.obj_size_rem = obj_size_rem
         self.save_indiv = save_indiv
-        self.image_size = image_size
+        self.image_size = (image_size[1], image_size[0])
 
 
     def generate(self, annot_dict):
@@ -284,14 +284,14 @@ class BinaryMaskGenerator(MaskGenerator):
             elif roi['type'] == 'freehand' or roi['type'] == 'polygon' or roi['type'] == 'polyline' or roi['type'] == 'Polygon':
 
                 # Draw polygon
-                rr, cc = skimage_draw.polygon(roi_pos[:, 0], roi_pos[:, 1])
+                rr, cc = skimage_draw.polygon([self.image_size[0]-r for r in roi_pos[:, 1]], roi_pos[:, 0])
 
                 # Make sure it's not outside
                 rr[rr < 0] = 0
                 rr[rr > self.image_size[0] - 1] = self.image_size[0] - 1
 
                 cc[cc < 0] = 0
-                cc[cc > self.image_size[0] - 1] = self.image_size[0] - 1
+                cc[cc > self.image_size[1] - 1] = self.image_size[1] - 1
 
                 # Test if this region has already been added
                 if any(np.array_equal(rr, rr_test) for rr_test in rr_all) and any(np.array_equal(cc, cc_test) for cc_test in cc_all):
