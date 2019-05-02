@@ -159,10 +159,11 @@ if __name__ == "__main__":
     # gen_mask_from_geojson(files_proc=files_proc)
 
     # generate mask from prediction.json
-    files_proc = ["datasets/anet_png_test/train/w1_bac_kif1c_6512_p02_/prediction.json"]
+    files_proc = ["datasets/home/example02/train/z010/annotation.json"]
+    # files_proc = ["datasets/anet_png_test/train/w1_bac_kif1c_6512_p02_/prediction.json"]
     # files_proc = ["datasets/anet_png_test/train/w1_bac_kif1c_6512_p02_/annotation.json"]
     # gen_mask_from_geojson(files_proc=files_proc, img_size=(2048, 2048), infer=True)
-    gen_mask_from_geojson(files_proc=files_proc, img_size=(2048, 2048), infer=False)
+    gen_mask_from_geojson(files_proc=files_proc, img_size=(624, 924), infer=False)
 
     # outputs_dir = 'datasets/anet_png_test/train/w1_bac_kif1c_6512_p02_'
     # masks_to_annotation(outputs_dir)

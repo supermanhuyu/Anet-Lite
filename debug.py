@@ -15,9 +15,9 @@ import os
 import shutil
 from PIL import Image
 
-sample_dir = "datasets/anet/"
-# train_dir = "datasets/anet/train"
-train_dir = "datasets/anet/valid"
+sample_dir = "datasets/anet_tif/"
+train_dir = "datasets/anet_tif/train"
+# train_dir = "datasets/anet_tif/valid"
 
 sample_list = os.listdir(train_dir)
 for sample in sample_list:
