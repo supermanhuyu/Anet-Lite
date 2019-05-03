@@ -33,7 +33,7 @@ from anet.utils import export_model_to_js
 from imgseg import segmentationUtils
 from imgseg import annotationUtils
 from imgseg import DRFNStoolbox
-
+os.chdir('..')
 # import importlib
 # importlib.reload(UnetGenerator)
 
@@ -114,12 +114,7 @@ class my_config():
         self.steps = steps
         self.batchsize = batchsize
 
-def my_opt(config):
-    work_dir = config["root_folder"]
-    # if config["root_folder"].startswith("/"):
-    #     work_dir = "datasets" + config["root_folder"]
-    # else:
-    #     work_dir = os.path.join("datasets", config["root_folder"])
+def my_opt(config, work_dir):
     opt = Options().parse(['--work_dir={}'.format(work_dir)])
     opt.work_dir = work_dir
     opt.input_size = 256
@@ -351,14 +346,19 @@ class ImJoyPlugin():
         await self.train_run("")
 
     async def train_run(self, my):
-        # json_path = "datasets/anet_png/config.json"
-        json_path = "datasets/example/config.json"
-        print("json_path:", json_path)
-
+        configPath = {"configPath": "dataset/example_anno/config.json"}
+        print("os.getcwd():", os.getcwd())
+        print("configPath:", configPath)
+        json_path = configPath["configPath"]
+        self.work_dir = os.path.dirname(configPath["configPath"])
+        print("self.work_dir:", self.work_dir)
         with open(json_path, "r") as f:
             json_content =f.read()
         self.config_json = json.loads(json_content)
         print("config_json:", self.config_json)
+
+        # await self.get_data_by_config(config=self.config_json)
+        self.get_mask_by_json(config=self.config_json)
 
         network_config = {
           "api_version": "0.1.3",
@@ -403,7 +403,7 @@ class ImJoyPlugin():
             # await self.get_data_by_config(config=config_json)
             # self.get_mask_by_json(config=self.config_json)
 
-            self._opt = my_opt(config_json)
+            self._opt = my_opt(config_json, work_dir=self.work_dir)
             # self._opt.load_from = "datasets/home/anet_png/__model__/__model__.hdf5"
             self._opt.load_from = "datasets/home/example/__model__/__model__.hdf5"
             self.initialize(self._opt)
@@ -458,29 +458,22 @@ class ImJoyPlugin():
             json.dump(model_config, f)
 
     async def auto_train(self, configPath):
+        print("os.getcwd():", os.getcwd())
         print("configPath:", configPath)
         # if configPath["configPath"].startswith("/"):
         #     json_path = "datasets" + configPath["configPath"]
         # else:
         #     json_path = os.path.join("datasets", configPath["configPath"])
-
         json_path = configPath["configPath"]
-        json_content = await self.readFile(configPath["configPath"])
-        if not os.path.exists(os.path.dirname(json_path)):
-            os.makedirs(os.path.dirname(json_path))
-        with open(json_path, "w") as f:
-            f.write(json_content)
-            print("config.json save to path :", json_path)
-
+        self.work_dir = os.path.dirname(configPath["configPath"])
+        print("self.work_dir:", self.work_dir)
+        with open(json_path, "r") as f:
+            json_content =f.read()
         self.config_json = json.loads(json_content)
         print("config_json:", self.config_json)
 
-        await self.get_data_by_config(config=self.config_json)
+        # await self.get_data_by_config(config=self.config_json)
         self.get_mask_by_json(config=self.config_json)
-        #
-        # self._opt = my_opt(config_json)
-        # self.initialize(self._opt)
-        # config = my_config()
 
         network_config = {
           "api_version": "0.1.3",
@@ -519,7 +512,7 @@ class ImJoyPlugin():
         self.config_json.update(callback_config)
 
         # self.get_mask_by_json(config=self.config_json)
-        self._opt = my_opt(self.config_json)
+        self._opt = my_opt(self.config_json, work_dir=self.work_dir)
         self.initialize(self._opt)
         print("self._opt.work_dir:", self._opt.work_dir)
         print("self._opt.input_channels:", self._opt.input_channels)
@@ -555,11 +548,6 @@ class ImJoyPlugin():
         return
 
     async def auto_test(self, samples):
-        # if samples["samples"][0].startswith("/"):
-        #     sample_path = "datasets" + samples["samples"][0]
-        # else:
-        #     sample_path = os.path.join("datasets", samples["samples"][0])
-
         sample_path = samples["samples"][0]
         print("start run GenericTransformedImages ...")
         if not self._initialized:
@@ -606,17 +594,11 @@ class ImJoyPlugin():
         fs_path = os.path.join(samples["samples"][0], 'prediction.json')
         # fs_path = "/tmp/prediction.json"
         print("save prediction.json to browser fs_path:", fs_path)
-        try:
-            await self.writeFile(fs_path, json.dumps(annotation_json))
-            # return fs_path
-        except:
-            print("write data to file: {} error.".format(fs_path))
-
-        # file_content = await self.readFile(fs_path)
-        # # print("file_content:", file_content)
-        # with open(fs_path, "w") as f:
-        #     f.write(file_content)
-
+        # try:
+        #     await self.writeFile(fs_path, json.dumps(annotation_json))
+        #     # return fs_path
+        # except:
+        #     print("write data to file: {} error.".format(fs_path))
         return annotation_json
 
     async def add_training_data(self, sample_path, local_anno=False):
@@ -646,11 +628,6 @@ class ImJoyPlugin():
         pass
 
     async def get_data_by_config(self, config):
-        # if config["root_folder"].startswith("/"):
-        #     self.work_dir = "datasets" + config["root_folder"]
-        # else:
-        #     self.work_dir = os.path.join("datasets", config["root_folder"])
-        self.work_dir = config["root_folder"]
         samples = config["samples"]
         for sample in samples:
             saved_dir = os.path.join(self.work_dir, sample["group"], sample["name"])
@@ -677,11 +654,6 @@ class ImJoyPlugin():
                     print("warnming: can not get the file :", file_fs_path)
 
     def get_mask_by_json(self, config):
-        # if config["root_folder"].startswith("/"):
-        #     work_dir = "datasets" + config["root_folder"]
-        # else:
-        #     work_dir = os.path.join("datasets", config["root_folder"])
-
         samples = config["samples"]
         anno_path_list = []
         for sample in samples:
