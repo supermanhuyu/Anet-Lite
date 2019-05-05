@@ -108,7 +108,7 @@ class UpdateUI(Callback):
         plot_tensors(self.dash, tensor_list, label, titles)
 
 class my_config():
-    def __init__(self, name="", epochs=10, batchsize=4, steps=4):
+    def __init__(self, name="", epochs=10, batchsize=4, steps=10):
         self.name = name
         self.epochs = epochs
         self.steps = steps
@@ -347,47 +347,7 @@ class ImJoyPlugin():
 
     async def train_run(self, my):
         configPath = {"configPath": "dataset/example_anno/config.json"}
-        print("os.getcwd():", os.getcwd())
-        print("configPath:", configPath)
-        json_path = configPath["configPath"]
-        self.work_dir = os.path.dirname(configPath["configPath"])
-        print("self.work_dir:", self.work_dir)
-        with open(json_path, "r") as f:
-            json_content =f.read()
-        self.config_json = json.loads(json_content)
-        print("config_json:", self.config_json)
-
-        # await self.get_data_by_config(config=self.config_json)
-        self.get_mask_by_json(config=self.config_json)
-
-        network_config = {
-          "api_version": "0.1.3",
-          "channel_config": self.config_json.get("channel_config"),
-          "annotation_types": self.config_json.get("annotation_types"),
-          "post_processing_types": [{"name": "withseed", "type": "withseed"},
-                                    {"name": "seedless", "type": "seedless",
-                                     "options": [{"type": "string","name": "seed"}]}],
-          "loss_types": [{"type": "mse"},
-                         {"type": "cross entropy"}],
-          "target_types": [{"type": "channel"},
-                           {"type": "annotation"}],
-          "target_masks": [{"type": "filled"},
-                           {"type": "distmap"},
-                           {"type": "edge"},
-                           {"type": "weighted"}],
-          "network_types": [{"type": "Anet"},
-                            {"type": "Unet"}]}
-
-        win = await api.createWindow({
-            "name": 'AnetConfig',
-            "type": 'AnetConfig',
-            "w": 20, "h": 15,
-            # "fullsize": True,
-            "data": {
-                "configJson": network_config,
-                "callback": self.finish_config_callback
-            }
-        })
+        await self.auto_train(configPath=configPath)
 
     async def test_run(self, my):
         if self._initialized:
@@ -475,35 +435,73 @@ class ImJoyPlugin():
         # await self.get_data_by_config(config=self.config_json)
         self.get_mask_by_json(config=self.config_json)
 
-        network_config = {
-          "api_version": "0.1.3",
-          "channel_config": self.config_json.get("channel_config"),
-          "annotation_types": self.config_json.get("annotation_types"),
-          "post_processing_types": [{"name": "withseed", "type": "withseed"},
-                                    {"name": "seedless", "type": "seedless",
-                                     "options": [{"type": "string","name": "seed"}]}],
-          "loss_types": [{"type": "mse"},
-                         {"type": "cross entropy"}],
-          "target_types": [{"type": "channel"},
-                           {"type": "annotation"}],
-          "target_masks": [{"type": "filled"},
-                           {"type": "distmap"},
-                           {"type": "edge"},
-                           {"type": "weighted"}],
-          "network_types": [{"type": "Anet"},
-                            {"type": "Unet"}]}
-
         win = await api.createWindow({
             "name": 'AnetConfig',
             "type": 'AnetConfig',
             "w": 20, "h": 15,
             # "fullsize": True,
             "data": {
-                "configJson": network_config,
+                "configJson": self.train_config(),
                 "callback": self.finish_config_callback
             }
         })
         # await self.train_2(config)
+
+    def train_config(self):
+        post_processing_types = ["withseed", "seedless"]
+        loss_types = ["mse",  "cross entropy"]
+        target_types = ["channel", "annotation"]
+        target_masks_type = ["filled", "distmap", "edge", "weighted"]
+        network_types = ["Anet", "Unet"]
+        channel_config = self.config_json.get("channel_config")
+        annotation_types = self.config_json.get("annotation_types")
+        outputs_config = []
+        for label in annotation_types.keys():
+            outputs_config.append({
+                "loss": {
+                    "type": loss_types[0]
+                },
+                "name": label+"_"+target_masks_type[0],
+                "postProcessing": {
+                    "name": "seedless",
+                    "type": "seedless",
+                    "seed": ""
+                },
+                "target": {
+                    "name": label+"_"+target_masks_type[0],
+                    "type": "annotation"
+                }})
+            outputs_config.append({
+                "loss": {
+                    "type": loss_types[0]
+                },
+                "name": label+"_"+target_masks_type[1],
+                "postProcessing": {
+                    "name": "withseed",
+                    "type": "withseed",
+                    "seed": label+"_"+target_masks_type[0]
+                },
+                "target": {
+                    "name": label+"_"+target_masks_type[1],
+                    "type": "annotation"
+                }})
+
+        network_config = {
+          "api_version": "0.1.3",
+          "channel_config": channel_config,
+          "annotation_types": annotation_types,
+          "post_processing_types": [{"name": pp_type, "type": pp_type} for pp_type in post_processing_types],
+          "loss_types": [{"type": loss} for loss in loss_types],
+          "target_types": [{"type": t_type} for t_type in target_types],
+          "target_masks": [{"type": t_mask_type} for t_mask_type in target_masks_type],
+          "network_types": [{"type": net} for net in network_types],
+          "default":{
+              "base_filter": "16",
+              "inputs": list(channel_config.keys()),
+              "outputs": outputs_config,
+              "network": {"type": "Anet"}}}
+        print("network_config:", network_config)
+        return network_config
 
     async def finish_config_callback(self, callback_config):
         print("callback_config:", callback_config)
