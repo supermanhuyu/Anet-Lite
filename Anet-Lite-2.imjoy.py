@@ -21,7 +21,6 @@ import shutil
 import time
 from skimage import io, measure
 from geojson import FeatureCollection, dump
-
 os.chdir('Anet-Lite')
 from anet.options import Options
 from anet.data.examples import GenericTransformedImages
@@ -34,8 +33,6 @@ from imgseg import segmentationUtils
 from imgseg import annotationUtils
 from imgseg import DRFNStoolbox
 os.chdir('..')
-# import importlib
-# importlib.reload(UnetGenerator)
 
 abort = threading.Event()
 
@@ -127,9 +124,6 @@ def my_opt(config, work_dir):
     inputs = config.get("inputs")
     outputs = config.get("outputs")
     # network = config.get("network")
-    # print("get inputs:", inputs)
-    # print("get outputs:", outputs)
-    # print("get network:", network)
 
     opt.channel = config.get("channel_config")
     for key in [input_key for input_key in opt.channel.keys() if input_key in inputs]:
@@ -138,16 +132,6 @@ def my_opt(config, work_dir):
     for out in outputs:
         print("add target_channel:", out.get("name"))
         opt.target_channels.append((out.get("name"), {'filter': "*"+out.get("name")+"*", 'loader': ImageLoader()},))
-
-    # try:
-    #     annotation_types = config.get("annotation_types")
-    #     for key in annotation_types.keys():
-    #         print("get label:", annotation_types[key].get("label"))
-    #         opt.target_channels.append((annotation_types[key].get("label")+"_filled", {'filter': "*"+annotation_types[key].get("label")+"_filled*", 'loader': ImageLoader()},))
-    #         opt.target_channels.append((annotation_types[key].get("label")+"_distmap", {'filter': "*"+annotation_types[key].get("label")+"_distmap*", 'loader': ImageLoader()},))
-    # except:
-    #     print("get label error from annotation_types in the config.json.")
-    #     pass
 
     opt.input_nc = len(opt.input_channels)
     opt.target_nc = len(opt.target_channels)
@@ -433,6 +417,7 @@ class ImJoyPlugin():
         print("config_json:", self.config_json)
 
         # await self.get_data_by_config(config=self.config_json)
+        api.showStatus("generating mask from the annotation file ...")
         self.get_mask_by_json(config=self.config_json)
 
         win = await api.createWindow({
@@ -668,7 +653,7 @@ class ImJoyPlugin():
                     print("anno_path:", anno_path)
                     anno_path_list.append(anno_path)
                 else:
-                    print("can not file annotation file:", anno_path)
+                    print("can not find annotation file:", anno_path)
             else:
                 print("skip generate mask from test group.")
         if len(anno_path_list) != 0:
@@ -733,6 +718,10 @@ class ImJoyPlugin():
 
         api.fs.writeFile(path, file_data, read)
         return fut
+
+    async def get_engine(self):
+        print("api.ENGINE_URL:", api.ENGINE_URL)
+        return api.ENGINE_URL
 
     async def freeze_model(self, my):
         if not self._initialized:
