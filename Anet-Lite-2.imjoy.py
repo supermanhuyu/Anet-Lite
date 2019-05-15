@@ -83,7 +83,7 @@ Once done, the result will be saved automatically into the testing folder.
 {
   "name": "Anet-Lite",
   "type": "native-python",
-  "version": "0.2.34",
+  "version": "0.3.2",
   "api_version": "0.1.3",
   "description": "A generic plugin for image-to-image translation with A-net.",
   "tags": ["CPU", "GPU", "Windows-CPU", "Window-GPU"],
@@ -104,7 +104,8 @@ Once done, the result will be saved automatically into the testing folder.
    },
    "flags": [],
   "dependencies": ["oeway/ImJoy-Plugins:Im2Im-Dashboard",
-    "https://git.sg-ai.com/imjoy/ImJoy-Plugins/raw/master/plugins/AnetConfig.imjoy.html"]
+                   "https://git.sg-ai.com/imjoy/ImJoy-Plugins/raw/master/plugins/ImageSelection.imjoy.html",
+                   "https://git.sg-ai.com/imjoy/ImJoy-Plugins/raw/master/plugins/AnetConfig.imjoy.html"]
 }
 </config>
 
@@ -439,11 +440,24 @@ class ImJoyPlugin():
         pass
 
     async def run(self, my):
-        await self.train("")
+        self.Img_Select_window = await api.showDialog({
+            "name": "ImageSelection",
+            "type": "ImageSelection",
+            "data": {
+                "callback": self.train
+            }
+        })
+        # await self.train("")
+        print("Img_Select_window:", self.Img_Select_window)
+        # configPath = {"configPath": os.path.join(datasets_dir, "config.json")}
+        # await self.auto_train(configPath=configPath)
 
-    async def train(self, my):
-        weight_path = await api.showFileDialog(root=os.getcwd(), type="directory")
-        configPath = {"configPath": os.path.join(weight_path, "config.json")}
+    async def train(self, weight_path, weight_path2):
+        self.Img_Select_window.close()
+        # weight_path = await api.showFileDialog(root=os.getcwd(), type="directory")
+        print("weight_path[root_folder]", weight_path["root_folder"])
+        # print("weight_path2:", weight_path2)
+        configPath = {"configPath": os.path.join(weight_path["root_folder"], "config.json")}
         await self.auto_train(configPath=configPath)
 
     async def train_run(self, my):
@@ -533,9 +547,9 @@ class ImJoyPlugin():
         self.config_json = json.loads(json_content)
         print("config_json:", self.config_json)
 
-        # await self.get_data_by_config(config=self.config_json)
-        api.showStatus("generating mask from the annotation file ...")
-        self.get_mask_by_json(config=self.config_json)
+        # # await self.get_data_by_config(config=self.config_json)
+        # api.showStatus("generating mask from the annotation file ...")
+        # self.get_mask_by_json(config=self.config_json)
 
         win = await api.createWindow({
             "name": 'AnetConfig',
@@ -610,6 +624,10 @@ class ImJoyPlugin():
         with open(os.path.join(self.work_dir, "anet-config.json"), "w") as f:
             f.write(json.dumps(callback_config))
         self.config_json.update(callback_config)
+
+        # await self.get_data_by_config(config=self.config_json)
+        api.showStatus("generating mask from the annotation file ...")
+        self.get_mask_by_json(config=self.config_json)
 
         # self.get_mask_by_json(config=self.config_json)
         self._opt = my_opt(self.config_json, work_dir=self.work_dir)
