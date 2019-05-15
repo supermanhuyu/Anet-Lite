@@ -1,3 +1,113 @@
+<docs lang="markdown">
+# Anet-lite
+
+A generic plugin for image-to-image translation with A-net.
+
+## Usage
+
+### Data preparation
+Your data should be organized according to the following structure
+
+```
+ - train
+    - sample1
+      - channelA.png
+      - channelB.png
+      - channelC.png
+    - sample2
+      - channelA.png
+      - channelB.png
+      - channelC.png
+    - ...
+ - valid
+    - sample20
+      - channelA.png
+      - channelB.png
+      - channelC.png
+    - ...
+ - test
+    - sample43
+      - channelA.png
+      - channelC.png
+    - sample44
+      - channelA.png
+      - channelC.png
+```
+In the above folder structure, `train/valid/test` are three folders, `sample1`...`sample44` are sample folders, within the sample folder, it contains images with different channels.
+
+For the naming, you have to use `train`/`valid`/`test` as the top level folder name, but the sample name can be choose freely.
+You can also choose different channel names (e.g. `DAPI`, `C5`), but you need to make it consistent accross all the sample folder.
+
+These channel names will be used as an identifier for the plugin to recognize them, you will be asked to specify them when you `set working directory`.
+
+### Set working directory and parameters
+
+If you have the samples pepared the next step is to `set working directory` to the root folder of your samples.
+
+And you will be asked to specify the identifiers for your plugin.
+
+The following parameter can be configured:
+ * input identifiers and output identifiers: a string which specifies the naming pattern of each input and output channels, for example, the above folder structure contains `channelA.png`, `channelB.png` and `channelC.png`,
+ if we want to use all the `channelA.png` and `channelC.png` as input channels, we can set `Cells=channelA*.png,DAPI=channelC*.png`,
+ where before `=` is the name we given for each channel, and we used `,` to seperate channels. Similary for the input channels, we can specify `Mask=channelB*.png`.
+
+Here we used a `*` here which means it can be replaced with any symbol, here there is no extra, it is designed for when there are multiple images belongs to the same channel.
+
+## Optionally, loading previously trained models
+
+## start the training
+
+The training will relying on two folders named `train` and `valid`, you need to make sure you have them in your working directory.
+
+You can specify a training name, which will be used a prefix for saving models and logs.
+Choose the `epochs`, `step per epoch` and `batch size` you want to train.
+
+Then you can start training by click on the plugin menu.
+
+If the training is done, you will get your model located in the `working directory`, the folder will be called `__model__`.
+
+You can load the file named `*__model__.h5` next time if you want to start another training with this one (aka warm start).
+
+Or you can load the trained model for testing new images.
+
+## Testing/Inferencing
+Place your files with all the input channels in a folder `test` and you will be able to run prediction on them.
+
+By clicking `test` in the plugin menu, you will start the prediction.
+
+Once done, the result will be saved automatically into the testing folder.
+
+</docs>
+
+<config lang="json">
+{
+  "name": "Anet-Lite",
+  "type": "native-python",
+  "version": "0.2.34",
+  "api_version": "0.1.3",
+  "description": "A generic plugin for image-to-image translation with A-net.",
+  "tags": ["CPU", "GPU", "Windows-CPU", "Window-GPU"],
+  "ui": [],
+  "inputs": null,
+  "outputs": null,
+  "icon": null,
+  "env": {
+    "CPU":["conda create -n anet-cpu python=3.6"],
+    "GPU": ["conda create -n anet-gpu2 python=3.6"],
+    "Windows-CPU": ["conda create -n anet-win-cpu python=3.6"],
+    "Windows-GPU": ["conda create -n anet-win-gpu python=3.6"]
+  },
+  "requirements": {"CPU":["repo: https://github.com/oeway/Anet-Lite", "read_roi", "scikit-image", "geojson", "shapely", "descartes", "geojson", "palettable", "tensorflow==1.5", "keras==2.2.1", "Pillow", "git+https://www.github.com/keras-team/keras-contrib.git", "pytest"],
+                    "GPU": ["repo: https://github.com/oeway/Anet-Lite", "read_roi", "scikit-image", "geojson", "shapely", "descartes", "geojson", "palettable", "tensorflow-gpu==1.5", "keras==2.2.1", "Pillow", "git+https://www.github.com/keras-team/keras-contrib.git", "pytest"],
+                    "Windows-CPU":["repo: https://github.com/oeway/Anet-Lite", "read_roi", "scikit-image", "geojson", "shapely", "descartes", "geojson", "palettable", "tensorflow==1.2", "keras==2.2.1", "Pillow", "git+https://www.github.com/keras-team/keras-contrib.git", "pytest"],
+                    "Windows-GPU": ["repo: https://github.com/oeway/Anet-Lite", "read_roi", "scikit-image", "geojson", "shapely", "descartes", "geojson", "palettable", "tensorflow-gpu==1.2", "keras==2.2.1", "Pillow", "git+https://www.github.com/keras-team/keras-contrib.git", "pytest"]
+   },
+   "flags": [],
+  "dependencies": ["oeway/ImJoy-Plugins:Im2Im-Dashboard",
+    "https://git.sg-ai.com/imjoy/ImJoy-Plugins/raw/master/plugins/AnetConfig.imjoy.html"]
+}
+</config>
+
 <script lang="python">
 import os
 import sys
@@ -322,12 +432,19 @@ class ImJoyPlugin():
         # api.showStatus("A-net lite successfully initialized.")
 
     async def setup(self):
-        api.register(name="train_run", run=self.train_run, ui="train_run")
-        api.register(name="test_run", run=self.test_run, ui="test_run")
-        api.register(name="add_train_run", run=self.add_train_run, ui="add_train_run")
+        # api.register(name="train", run=self.train, ui="train")
+        # api.register(name="train_run", run=self.train_run, ui="train_run")
+        # api.register(name="test_run", run=self.test_run, ui="test_run")
+        # api.register(name="add_train_run", run=self.add_train_run, ui="add_train_run")
+        pass
 
     async def run(self, my):
-        await self.train_run("")
+        await self.train("")
+
+    async def train(self, my):
+        weight_path = await api.showFileDialog(root=os.getcwd(), type="directory")
+        configPath = {"configPath": os.path.join(weight_path, "config.json")}
+        await self.auto_train(configPath=configPath)
 
     async def train_run(self, my):
         configPath = {"configPath": "dataset/example_anno/config.json"}
