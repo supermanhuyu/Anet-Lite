@@ -83,7 +83,7 @@ Once done, the result will be saved automatically into the testing folder.
 {
   "name": "Anet-Lite",
   "type": "native-python",
-  "version": "0.3.2",
+  "version": "0.3.6",
   "api_version": "0.1.3",
   "description": "A generic plugin for image-to-image translation with A-net.",
   "tags": ["CPU", "GPU", "Windows-CPU", "Window-GPU"],
@@ -132,6 +132,7 @@ import shutil
 import time
 from skimage import io, measure
 from geojson import FeatureCollection, dump
+
 os.chdir('Anet-Lite')
 from anet.options import Options
 from anet.data.examples import GenericTransformedImages
@@ -143,7 +144,7 @@ from anet.utils import export_model_to_js
 from imgseg import segmentationUtils
 from imgseg import annotationUtils
 from imgseg import DRFNStoolbox
-os.chdir('..')
+# os.chdir('..')
 
 abort = threading.Event()
 
@@ -215,191 +216,14 @@ class UpdateUI(Callback):
         titles = [self.input_channels, self.output_channels, self.target_channels]
         plot_tensors(self.dash, tensor_list, label, titles)
 
+
 class my_config():
     def __init__(self, name="", epochs=10, batchsize=4, steps=10):
         self.name = name
         self.epochs = epochs
         self.steps = steps
         self.batchsize = batchsize
-
-def my_opt(config, work_dir):
-    opt = Options().parse(['--work_dir={}'.format(work_dir)])
-    opt.work_dir = work_dir
-    opt.input_size = 256
-    opt.base_filter = int(config.get("base_filter"))
-    opt.input_channels = []
-    opt.target_channels = []
-    # opt.load_from = None
-    # opt.checkpoints_dir = opt.work_dir + "/__model__"
-
-    inputs = config.get("inputs")
-    outputs = config.get("outputs")
-    # network = config.get("network")
-
-    opt.channel = config.get("channel_config")
-    for key in [input_key for input_key in opt.channel.keys() if input_key in inputs]:
-        opt.input_channels.append((opt.channel[key]["name"], {'filter': "*"+opt.channel[key]["filter"]+"*", 'loader': ImageLoader()},))
-
-    for out in outputs:
-        print("add target_channel:", out.get("name"))
-        opt.target_channels.append((out.get("name"), {'filter': "*"+out.get("name")+"*", 'loader': ImageLoader()},))
-
-    opt.input_nc = len(opt.input_channels)
-    opt.target_nc = len(opt.target_channels)
-    return opt
-
-
-def gen_mask_from_geojson(files_proc, img_size=None, infer=False):
-    # %% Some housekeeping to setup example data
-    # files_proc= [os.path.abspath(os.path.join('..','data','maskGenerator','img','annotation.json'))]
-
-    # masks_to_create = {
-    #   "cells": ['filled', 'edge', 'distance', 'weigthed'],
-    #   "nuclei": ['filled', 'edge', 'distance', 'weigthed'],
-    # }
-    masks_to_create = {}
-    masks_to_create_value = ['filled', 'edge', 'distance', 'weigthed']
-
-    # annot_types = list(masks_to_create.keys())
-
-    annotationsImporter = annotationUtils.GeojsonImporter()
-
-    # Instance to save masks
-    masks = annotationUtils.MaskGenerator()
-
-    weightedEdgeMasks = annotationUtils.WeightedEdgeMaskGenerator(sigma=8, w0=10)
-    distMapMasks = annotationUtils.DistanceMapGenerator(truncate_distance=None)
-
-    #%% Loop over all files
-    for file_proc in files_proc:
-        print('PROCESSING FILE:')
-        print(file_proc)
-
-        # Decompose file name
-        drive, path_and_file = os.path.splitdrive(file_proc)
-        path, file = os.path.split(path_and_file)
-        file_base, ext = os.path.splitext(file)
-
-        # Read annotation:  Correct class has been selected based on annot_type
-        annot_dict_all, roi_size_all, image_size = annotationsImporter.load(file_proc)
-        if img_size is not None:
-            image_size = img_size
-
-        annot_types = set(annot_dict_all[k]['properties']['label'] for k in annot_dict_all.keys())
-        print("annot_types: ", annot_types)
-
-        for annot_type in annot_types:
-            # print("annot_type: ", annot_type)
-            masks_to_create[annot_type] = masks_to_create_value
-
-            # Filter the annotations by label
-            annot_dict = {k: annot_dict_all[k] for k in annot_dict_all.keys() if annot_dict_all[k]['properties']['label'] == annot_type}
-            # print("len(annot_dict):", len(annot_dict))
-            # print("annot_dict.keys():", annot_dict.keys())
-
-            # Create masks
-
-            # Binary - is always necessary to creat other masks
-            print(' .... creating binary masks .....')
-            binaryMasks = annotationUtils.BinaryMaskGenerator(image_size=image_size, erose_size=5, obj_size_rem=500, save_indiv=True)
-            mask_dict = binaryMasks.generate(annot_dict)
-
-            # Save binary masks FILLED if specified
-            if 'filled' in masks_to_create[annot_type]:
-                if infer:
-                    file_name_save = os.path.join(drive,path, annot_type + '_filled_output.png')
-                else:
-                    file_name_save = os.path.join(drive,path, annot_type + '_filled.png')
-                masks.save(mask_dict,'fill',file_name_save)
-
-            # # Edge mask
-            # if 'edge' in masks_to_create[annot_type]:
-            #     if infer:
-            #         file_name_save = os.path.join(drive,path, annot_type + '_edge_output.png')
-            #     else:
-            #         file_name_save = os.path.join(drive,path, annot_type + '_edge.png')
-            #     masks.save(mask_dict,'edge',file_name_save)
-
-            # Distance map
-            if 'distance' in masks_to_create[annot_type]:
-                print(' .... creating distance maps .....')
-                mask_dict = distMapMasks.generate(annot_dict,mask_dict)
-
-                # Save
-                if infer:
-                    file_name_save = os.path.join(drive,path, annot_type + '_distmap_output.png')
-                else:
-                    file_name_save = os.path.join(drive,path, annot_type + '_distmap.png')
-                masks.save(mask_dict,'distance_map',file_name_save)
-
-            # # Weighted edge mask
-            # if 'weigthed' in masks_to_create[annot_type]:
-            #     print(' .... creating weighted edge masks .....')
-            #     mask_dict = weightedEdgeMasks.generate(annot_dict,mask_dict)
-            #
-            #     # Save
-            #     if infer:
-            #         file_name_save = os.path.join(drive,path, annot_type + '_edgeweight_output.png')
-            #     else:
-            #         file_name_save = os.path.join(drive,path, annot_type + '_edgeweight.png')
-            #     masks.save(mask_dict,'edge_weighted',file_name_save)
-
-
-def masks_to_annotation(outputs_dir, outputs=None):
-    # %% Process one folder and save as one json file allowing multiple annotation types
-    simplify_tol = 0  # Tolerance for polygon simplification with shapely (0 to not simplify)
-
-    if os.path.exists(outputs_dir):
-        print(f'Analyzing folder:{outputs_dir}')
-        features = []  # For geojson
-        image_size = None
-        for out in outputs:
-            file_full = os.path.join(outputs_dir, out.get("name")+"_output.png")
-            if os.path.exists(file_full):
-                print("get output file path:", file_full)
-                mask_img = io.imread(file_full)
-                print("mask_img.shape:", mask_img.shape)
-                mask = measure.label(mask_img)
-                post_mask = DRFNStoolbox.seedless_segment(mask, 15, p_thresh=0.5)
-                img = Image.fromarray(post_mask.astype('uint8'))
-                img.save(os.path.join(outputs_dir, out.get("name")+'_noSeeds_OBJECTS.png'))
-                if out.get("postProcessing").get("type") == "withseed":
-                    seed_mask_file = os.path.join(outputs_dir, out.get("postProcessing").get("seed")+"_output.png")
-                    if os.path.exists(seed_mask_file):
-                        print("get seed mask file :", seed_mask_file)
-                        seed_mask_img = io.imread(seed_mask_file)
-                        print("seed_mask_img.shape:", seed_mask_img.shape)
-                        seed_mask = measure.label(seed_mask_img)
-                        post_mask = DRFNStoolbox.segment_with_seed(seed_mask, post_mask, 15, p_thresh=0.5)
-                        img = Image.fromarray(post_mask.astype('uint8'))
-                        img.save(os.path.join(outputs_dir, out.get("name")+'_wSeeds_OBJECTS.png'))
-                    else:
-                        print("warming: seed mask file not exist:", seed_mask_file)
-
-                # Here summarizing the geojson should occur
-                image_size = mask_img.shape  # This might cause problems if any kind of binning was performed
-
-                # Get label from file name
-                label = out.get("name").split('_', 1)[0]
-                print("label:", label)
-                # print(mask_img[0:1, :100])
-
-                # Call function to transform segmentation masks into (geojson) polygons
-                feature, contours = segmentationUtils.masks_to_polygon(post_mask,
-                                                                        label=label,
-                                                                        simplify_tol=simplify_tol)
-                                                                        # save_name=file_full.replace(".png", ".json"))
-                features = features + feature
-            else:
-                print("warming: output file not exist:", file_full)
-        feature_collection = FeatureCollection(features, bbox=[0, 0.0, image_size[0], image_size[1]])
-
-        # Save to json file
-        save_name_json = os.path.join(outputs_dir, 'prediction.json')
-        with open(save_name_json, 'w') as f:
-            dump(feature_collection, f)
-            f.close()
-        return feature_collection
+        self.config_win = None
 
 
 class ImJoyPlugin():
@@ -433,10 +257,8 @@ class ImJoyPlugin():
         # api.showStatus("A-net lite successfully initialized.")
 
     async def setup(self):
-        # api.register(name="train", run=self.train, ui="train")
-        # api.register(name="train_run", run=self.train_run, ui="train_run")
-        # api.register(name="test_run", run=self.test_run, ui="test_run")
-        # api.register(name="add_train_run", run=self.add_train_run, ui="add_train_run")
+        api.register(name="train_test", run=self.train_test, ui="train")
+        api.register(name="predict_test", run=self.predict, ui="predict")
         pass
 
     async def run(self, my):
@@ -452,48 +274,77 @@ class ImJoyPlugin():
         # configPath = {"configPath": os.path.join(datasets_dir, "config.json")}
         # await self.auto_train(configPath=configPath)
 
-    async def train(self, weight_path, weight_path2):
+    async def train(self, config_json, Json_Status):
         self.Img_Select_window.close()
         # weight_path = await api.showFileDialog(root=os.getcwd(), type="directory")
-        print("weight_path[root_folder]", weight_path["root_folder"])
-        # print("weight_path2:", weight_path2)
-        configPath = {"configPath": os.path.join(weight_path["root_folder"], "config.json")}
-        await self.auto_train(configPath=configPath)
+        print("config_json:", config_json)
+        json_path = os.path.join(config_json["root_folder"], "config.json")
+        with open(json_path, "w") as f:
+            f.write(json.dumps(config_json))
+        # configPath = {"configPath": json_path}
+        # await self.auto_train(configPath=configPath)
 
-    async def train_run(self, my):
-        configPath = {"configPath": "dataset/example_anno/config.json"}
-        await self.auto_train(configPath=configPath)
+        self.config_json = config_json
+        self.work_dir = config_json["root_folder"]
+        print("self.work_dir:", self.work_dir)
 
-    async def test_run(self, my):
-        if self._initialized:
-            samples = os.listdir(os.path.join(self._opt.work_dir, "test"))
-        else:
-            json_path = "datasets/home/anet_png/config.json"
-            print("json_path:", json_path)
+        self.config_win = await api.showDialog({
+            "name": 'AnetConfig',
+            "type": 'AnetConfig',
+            "w": 20, "h": 15,
+            # "fullscreen": True,
+            "data": {
+                "configJson": self.train_config(),
+                "callback": self.finish_config_callback
+            }
+        })
 
-            with open(json_path, "r") as f:
-                json_content =f.read()
-            config_json = json.loads(json_content)
-            print("config_json:", config_json)
-            # await self.get_data_by_config(config=config_json)
-            # self.get_mask_by_json(config=self.config_json)
+    async def predict(self, my=None, sample_path=None):
+        if not self._initialized:
+            api.alert('Please click `Anet-Lite` before testing.')
+            return
 
-            self._opt = my_opt(config_json, work_dir=self.work_dir)
-            # self._opt.load_from = "datasets/home/anet_png/__model__/__model__.hdf5"
-            self._opt.load_from = "datasets/home/example/__model__/__model__.hdf5"
-            self.initialize(self._opt)
+        sources = GenericTransformedImages(self._opt)
+        batch_size = 1
+        source = sources['test']
+        count = 0
 
-            print("self._opt.work_dir:", self._opt.work_dir)
-            print("self._opt.input_channels:", self._opt.input_channels)
-            print("self._opt.target_channels:", self._opt.target_channels)
-            print("self._opt.input_nc:", self._opt.input_nc)
-            print("self._opt.target_nc:", self._opt.target_nc)
+        if sample_path is None:
+            test_samples = os.listdir(os.path.join(self.work_dir, "test"))
+            sample_path = os.path.join(self.work_dir, "test", test_samples[0])
+        # print("start run cus_make_test_generator ...")
+        gen = self.cus_make_test_generator(source, sample_path)
+        # gen = make_test_generator(source)
+        api.showStatus('making predictions.')
+        totalsize = len(source)
+        self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Anet-lite Prediction", w=25, h=10,
+                                           data={"display_mode": "all"})
 
-            samples = os.listdir(os.path.join(self._opt.work_dir, "test"))
-            self._initialized = True
+        input_channels = [ch[0] for ch in self._opt.input_channels]
+        output_channels = [ch[0] + '_output' for ch in self._opt.target_channels]
+        label = 'Sample '
+        titles = [input_channels, output_channels]
+        print("titles:", titles)
 
-        sample_path = {"samples": [os.path.join(self._opt.work_dir, "test", samples[0])]}
-        await self.auto_test(samples=sample_path)
+        xbatch, paths = next(gen)
+        print("start run predict ...")
+        ypbatch = self.model.predict(xbatch, batch_size=batch_size)
+        tensor_list = [xbatch, ypbatch]
+        plot_tensors(self.dash, tensor_list, label, titles)
+        count += batch_size
+        for b in range(len(ypbatch)):
+            image = ypbatch[b]
+            path = paths[b]
+            _, name = os.path.split(path)
+            # output_path = os.path.join(sample_path, name)
+            for i in range(image.shape[2]):
+                misc.imsave(os.path.join(sample_path, output_channels[i] + '.png'),
+                            image[:, :, i].astype('float32'))
+        api.showProgress(1.0 * count / totalsize)
+        api.showStatus('making predictions: {}/{}'.format(count, totalsize))
+        annotation_json = self.masks_to_annotation(sample_path, outputs=self.config_json.get("outputs"))
+        print("save prediction.json to path:", sample_path)
+        return annotation_json
 
     async def add_train_run(self, my):
         sample_path = "datasets/example/test/z018"
@@ -532,95 +383,78 @@ class ImJoyPlugin():
         with open(os.path.join(opt.work_dir, 'model_config.json'), 'w') as f:
             json.dump(model_config, f)
 
-    async def auto_train(self, configPath):
-        print("os.getcwd():", os.getcwd())
-        print("configPath:", configPath)
-        # if configPath["configPath"].startswith("/"):
-        #     json_path = "datasets" + configPath["configPath"]
-        # else:
-        #     json_path = os.path.join("datasets", configPath["configPath"])
-        json_path = configPath["configPath"]
-        self.work_dir = os.path.dirname(configPath["configPath"])
-        print("self.work_dir:", self.work_dir)
-        with open(json_path, "r") as f:
-            json_content =f.read()
-        self.config_json = json.loads(json_content)
-        print("config_json:", self.config_json)
-
-        # # await self.get_data_by_config(config=self.config_json)
-        # api.showStatus("generating mask from the annotation file ...")
-        # self.get_mask_by_json(config=self.config_json)
-
-        win = await api.createWindow({
-            "name": 'AnetConfig',
-            "type": 'AnetConfig',
-            "w": 20, "h": 15,
-            # "fullsize": True,
-            "data": {
-                "configJson": self.train_config(),
-                "callback": self.finish_config_callback
-            }
-        })
-        # await self.train_2(config)
-
     def train_config(self):
         post_processing_types = ["withseed", "seedless"]
-        loss_types = ["mse",  "cross entropy"]
+        loss_types = ["mse", "cross entropy"]
         target_types = ["channel", "annotation"]
         target_masks_type = ["filled", "distmap", "edge", "weighted"]
         network_types = ["Anet", "Unet"]
         channel_config = self.config_json.get("channel_config")
         annotation_types = self.config_json.get("annotation_types")
+
+        default_values = None
+        if os.path.exists(os.path.join(self.work_dir, "anet-config.json")):
+            with open(os.path.join(self.work_dir, "anet-config.json"), "r") as f:
+                default_values = json.load(f)
+
         outputs_config = []
+        if default_values is None:
+            default_values = {
+                "base_filter": "16",
+                "inputs": list(channel_config.keys()),
+                "outputs": outputs_config,
+                "network": {"type": "Anet"}
+            }
+
         for label in annotation_types.keys():
             outputs_config.append({
                 "loss": {
                     "type": loss_types[0]
                 },
-                "name": label+"_"+target_masks_type[0],
+                "name": label + "_" + target_masks_type[0],
                 "postProcessing": {
                     "name": "seedless",
                     "type": "seedless",
                     "seed": ""
                 },
                 "target": {
-                    "name": label+"_"+target_masks_type[0],
+                    "name": label + "_" + target_masks_type[0],
                     "type": "annotation"
                 }})
             outputs_config.append({
                 "loss": {
                     "type": loss_types[0]
                 },
-                "name": label+"_"+target_masks_type[1],
+                "name": label + "_" + target_masks_type[1],
                 "postProcessing": {
                     "name": "withseed",
                     "type": "withseed",
-                    "seed": label+"_"+target_masks_type[0]
+                    "seed": label + "_" + target_masks_type[0]
                 },
                 "target": {
-                    "name": label+"_"+target_masks_type[1],
+                    "name": label + "_" + target_masks_type[1],
                     "type": "annotation"
                 }})
 
         network_config = {
-          "api_version": "0.1.3",
-          "channel_config": channel_config,
-          "annotation_types": annotation_types,
-          "post_processing_types": [{"name": pp_type, "type": pp_type} for pp_type in post_processing_types],
-          "loss_types": [{"type": loss} for loss in loss_types],
-          "target_types": [{"type": t_type} for t_type in target_types],
-          "target_masks": [{"type": t_mask_type} for t_mask_type in target_masks_type],
-          "network_types": [{"type": net} for net in network_types],
-          "default":{
-              "base_filter": "16",
-              "inputs": list(channel_config.keys()),
-              "outputs": outputs_config,
-              "network": {"type": "Anet"}}}
+            "api_version": "0.1.3",
+            "channel_config": channel_config,
+            "annotation_types": annotation_types,
+            "post_processing_types": [{"name": pp_type, "type": pp_type} for pp_type in post_processing_types],
+            "loss_types": [{"type": loss} for loss in loss_types],
+            "target_types": [{"type": t_type} for t_type in target_types],
+            "target_masks": [{"type": t_mask_type} for t_mask_type in target_masks_type],
+            "network_types": [{"type": net} for net in network_types],
+            "default": default_values}
+
         print("network_config:", network_config)
         return network_config
 
     async def finish_config_callback(self, callback_config):
         print("callback_config:", callback_config)
+        if self.config_win is not None:
+            self.config_win.close()
+        api.showMessage('network configured.')
         with open(os.path.join(self.work_dir, "anet-config.json"), "w") as f:
             f.write(json.dumps(callback_config))
         self.config_json.update(callback_config)
@@ -628,23 +462,46 @@ class ImJoyPlugin():
         # await self.get_data_by_config(config=self.config_json)
         api.showStatus("generating mask from the annotation file ...")
         self.get_mask_by_json(config=self.config_json)
-
-        # self.get_mask_by_json(config=self.config_json)
-        self._opt = my_opt(self.config_json, work_dir=self.work_dir)
+        api.showStatus("Masks generated, now start training...")
+        self._opt = self.get_opt(self.config_json, work_dir=self.work_dir)
         self.initialize(self._opt)
-        print("self._opt.work_dir:", self._opt.work_dir)
-        print("self._opt.input_channels:", self._opt.input_channels)
-        print("self._opt.target_channels:", self._opt.target_channels)
-        print("self._opt.input_nc:", self._opt.input_nc)
-        print("self._opt.target_nc:", self._opt.target_nc)
+        api.log("self._opt.work_dir:" + self._opt.work_dir)
+        api.log("self._opt.input_channels:" + str(self._opt.input_channels))
+        api.log("self._opt.target_channels:" + str(self._opt.target_channels))
+        api.log("self._opt.input_nc:" + str(self._opt.input_nc))
+        api.log("self._opt.target_nc:" + str(self._opt.target_nc))
 
         config = my_config()
-        print("config.name:", config.name)
-        print("config.epochs:", config.epochs)
-        print("config.steps:", config.steps)
-        print("config.batchsize:", config.batchsize)
+        api.log("config.name:" + config.name)
+        api.log("config.epochs:" + str(config.epochs))
+        api.log("config.steps:" + str(config.steps))
+        api.log("config.batchsize:" + str(config.batchsize))
 
         await self.train_2(config)
+
+    async def train_test(self, my=None, json_path=None):
+        print("os.getcwd():", os.getcwd())
+        print("my:", my)
+        # print("json_path:", json_path)
+        if json_path is None:
+            json_path = "datasets/data_bak/ex/example_anno/config.json"
+
+        with open(json_path, "r") as f:
+            config_json = json.loads(f.read())
+        self.config_json = config_json
+        self.work_dir = config_json["root_folder"]
+        print("self.work_dir:", self.work_dir)
+
+        self.config_win = await api.showDialog({
+            "name": 'AnetConfig',
+            "type": 'AnetConfig',
+            "w": 20, "h": 15,
+            # "fullscreen": True,
+            "data": {
+                "configJson": self.train_config(),
+                "callback": self.finish_config_callback
+            }
+        })
 
     def cus_make_test_generator(self, source, sample_path, batch_size=1):
         x, path = [], []
@@ -665,60 +522,6 @@ class ImJoyPlugin():
                     count += 1
         return
 
-    async def auto_test(self, samples):
-        sample_path = samples["samples"][0]
-        print("start run GenericTransformedImages ...")
-        if not self._initialized:
-            api.alert('Please click `Anet-Lite` before testing.')
-            return
-        sources = GenericTransformedImages(self._opt)
-        batch_size = 1
-        source = sources['test']
-        count = 0
-
-        # print("start run cus_make_test_generator ...")
-        gen = self.cus_make_test_generator(source, sample_path)
-        # gen = make_test_generator(source)
-        api.showStatus('making predictions.')
-        totalsize = len(source)
-        self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Anet-lite Prediction", w=25, h=10,
-                                           data={"display_mode": "all"})
-
-        input_channels = [ch[0] for ch in self._opt.input_channels]
-        output_channels = [ch[0] + '_output'  for ch in self._opt.target_channels]
-        label = 'Sample '
-        titles = [input_channels, output_channels]
-        print("titles:", titles)
-
-        xbatch, paths = next(gen)
-        print("start run predict ...")
-        ypbatch = self.model.predict(xbatch, batch_size=batch_size)
-        tensor_list = [xbatch, ypbatch]
-        plot_tensors(self.dash, tensor_list, label, titles)
-        count += batch_size
-        for b in range(len(ypbatch)):
-            image = ypbatch[b]
-            path = paths[b]
-            _, name = os.path.split(path)
-            # output_path = os.path.join(sample_path, name)
-            for i in range(image.shape[2]):
-                misc.imsave(os.path.join(sample_path, output_channels[i] + '.png'),
-                            image[:, :, i].astype('float32'))
-        api.showProgress(1.0 * count / totalsize)
-        api.showStatus('making predictions: {}/{}'.format(count, totalsize))
-        # mask_file = os.path.join(sample_path, output_channels[0] + '.png')
-        # save_name = os.path.join(sample_path, 'annotation_MASK.json')
-        annotation_json = masks_to_annotation(sample_path, outputs=self.config_json.get("outputs"))
-        fs_path = os.path.join(samples["samples"][0], 'prediction.json')
-        # fs_path = "/tmp/prediction.json"
-        print("save prediction.json to browser fs_path:", fs_path)
-        # try:
-        #     await self.writeFile(fs_path, json.dumps(annotation_json))
-        #     # return fs_path
-        # except:
-        #     print("write data to file: {} error.".format(fs_path))
-        return annotation_json
-
     async def add_training_data(self, sample_path, local_anno=False):
         # get annotation.json
         file_fs_path = os.path.join(sample_path, "annotation.json")
@@ -732,7 +535,7 @@ class ImJoyPlugin():
         # generate mask
         if os.path.exists(anno_path):
             print("generate mask from file:", anno_path)
-            gen_mask_from_geojson(files_proc=[anno_path])
+            self.gen_mask_from_geojson(files_proc=[anno_path])
         else:
             print("can not find annotation file:", anno_path)
 
@@ -755,7 +558,8 @@ class ImJoyPlugin():
             # save img file
             sample_data = sample["data"]
             for key in sample_data.keys():
-                file_fs_path = os.path.join(config["root_folder"], sample["group"], sample["name"], sample_data[key]["file_name"])
+                file_fs_path = os.path.join(config["root_folder"], sample["group"], sample["name"],
+                                            sample_data[key]["file_name"])
                 file_path = os.path.join(self.work_dir, sample["group"], sample["name"], sample_data[key]["file_name"])
                 try:
                     file_content = await self.readFile(file_fs_path)
@@ -795,14 +599,14 @@ class ImJoyPlugin():
             with open(anno_path_list[0]) as f:
                 anno_json = json.loads(f.read())
                 bbox = anno_json.get("bbox")
-                gen_mask_from_geojson(files_proc=anno_path_list, img_size=(bbox[2], bbox[3]))
-                # gen_mask_from_geojson(files_proc=anno_path_list, img_size=(bbox[3], bbox[2]))
+                self.gen_mask_from_geojson(files_proc=anno_path_list, img_size=(bbox[2], bbox[3]))
+            # self.gen_mask_from_geojson(files_proc=anno_path_list)
         return True
-        pass
 
     def readFile(self, path):
         loop = asyncio.get_event_loop()
         fut = loop.create_future()
+
         def cb(err, data=None):
             if err:
                 fut.set_exception(Exception(err))
@@ -814,7 +618,7 @@ class ImJoyPlugin():
 
     def fs_readfile(self, path):
         saved_dir = "datasets" + os.path.dirname(path)
-        saved_path = "datasets" +  path
+        saved_path = "datasets" + path
         if not os.path.exists(saved_dir):
             os.makedirs(saved_dir)
 
@@ -889,6 +693,189 @@ class ImJoyPlugin():
         tf.train.write_graph(frozen_graph, opt.work_dir, "tensorflow_model.pb", as_text=False)
 
         api.alert('model has been exported as ' + os.path.abspath(os.path.join(opt.work_dir, "tensorflow_model.pb")))
+
+    def get_opt(self, config, work_dir):
+        opt = Options().parse(['--work_dir={}'.format(work_dir)])
+        opt.work_dir = work_dir
+        opt.input_size = 256
+        opt.base_filter = int(config.get("base_filter"))
+        opt.input_channels = []
+        opt.target_channels = []
+        # opt.load_from = None
+        # opt.checkpoints_dir = opt.work_dir + "/__model__"
+
+        inputs = config.get("inputs")
+        outputs = config.get("outputs")
+        # network = config.get("network")
+
+        opt.channel = config.get("channel_config")
+        for key in [input_key for input_key in opt.channel.keys() if input_key in inputs]:
+            opt.input_channels.append(
+                (opt.channel[key]["name"], {'filter': "*" + opt.channel[key]["filter"] + "*", 'loader': ImageLoader()},))
+
+        for out in outputs:
+            print("add target_channel:", out.get("name"))
+            opt.target_channels.append((out.get("name"), {'filter': "*" + out.get("name") + "*", 'loader': ImageLoader()},))
+
+        opt.input_nc = len(opt.input_channels)
+        opt.target_nc = len(opt.target_channels)
+        return opt
+
+    def gen_mask_from_geojson(self, files_proc, img_size=None, infer=False):
+        # %% Some housekeeping to setup example data
+        # files_proc= [os.path.abspath(os.path.join('..','data','maskGenerator','img','annotation.json'))]
+
+        # masks_to_create = {
+        #   "cells": ['filled', 'edge', 'distance', 'weigthed'],
+        #   "nuclei": ['filled', 'edge', 'distance', 'weigthed'],
+        # }
+        masks_to_create = {}
+        masks_to_create_value = ['filled', 'edge', 'distance', 'weigthed']
+
+        # annot_types = list(masks_to_create.keys())
+
+        annotationsImporter = annotationUtils.GeojsonImporter()
+
+        # Instance to save masks
+        masks = annotationUtils.MaskGenerator()
+
+        weightedEdgeMasks = annotationUtils.WeightedEdgeMaskGenerator(sigma=8, w0=10)
+        distMapMasks = annotationUtils.DistanceMapGenerator(truncate_distance=None)
+
+        # %% Loop over all files
+        count = len(files_proc)
+        for i, file_proc in enumerate(files_proc):
+            print('PROCESSING FILE:')
+            print(file_proc)
+            dir_name, file_name = os.path.split(file_proc)
+            api.showStatus('generating masks for: ' + dir_name.split('/')[-1])
+            api.showProgress(i / count * 100)
+            # Decompose file name
+            drive, path_and_file = os.path.splitdrive(file_proc)
+            path, file = os.path.split(path_and_file)
+            file_base, ext = os.path.splitext(file)
+
+            # Read annotation:  Correct class has been selected based on annot_type
+            annot_dict_all, roi_size_all, image_size = annotationsImporter.load(file_proc)
+            if img_size is not None:
+                image_size = img_size
+
+            annot_types = set(annot_dict_all[k]['properties']['label'] for k in annot_dict_all.keys())
+            print("annot_types: ", annot_types)
+
+            for annot_type in annot_types:
+                # print("annot_type: ", annot_type)
+                masks_to_create[annot_type] = masks_to_create_value
+
+                # Filter the annotations by label
+                annot_dict = {k: annot_dict_all[k] for k in annot_dict_all.keys() if
+                              annot_dict_all[k]['properties']['label'] == annot_type}
+                # print("len(annot_dict):", len(annot_dict))
+                # print("annot_dict.keys():", annot_dict.keys())
+
+                # Create masks
+
+                # Binary - is always necessary to creat other masks
+                print(' .... creating binary masks .....')
+                binaryMasks = annotationUtils.BinaryMaskGenerator(image_size=image_size, erose_size=5, obj_size_rem=500,
+                                                                  save_indiv=True)
+                mask_dict = binaryMasks.generate(annot_dict)
+
+                # Save binary masks FILLED if specified
+                if 'filled' in masks_to_create[annot_type]:
+                    if infer:
+                        file_name_save = os.path.join(drive, path, annot_type + '_filled_output.png')
+                    else:
+                        file_name_save = os.path.join(drive, path, annot_type + '_filled.png')
+                    masks.save(mask_dict, 'fill', file_name_save)
+
+                # # Edge mask
+                # if 'edge' in masks_to_create[annot_type]:
+                #     if infer:
+                #         file_name_save = os.path.join(drive,path, annot_type + '_edge_output.png')
+                #     else:
+                #         file_name_save = os.path.join(drive,path, annot_type + '_edge.png')
+                #     masks.save(mask_dict,'edge',file_name_save)
+
+                # Distance map
+                if 'distance' in masks_to_create[annot_type]:
+                    print(' .... creating distance maps .....')
+                    mask_dict = distMapMasks.generate(annot_dict, mask_dict)
+
+                    # Save
+                    if infer:
+                        file_name_save = os.path.join(drive, path, annot_type + '_distmap_output.png')
+                    else:
+                        file_name_save = os.path.join(drive, path, annot_type + '_distmap.png')
+                    masks.save(mask_dict, 'distance_map', file_name_save)
+
+                # # Weighted edge mask
+                # if 'weigthed' in masks_to_create[annot_type]:
+                #     print(' .... creating weighted edge masks .....')
+                #     mask_dict = weightedEdgeMasks.generate(annot_dict,mask_dict)
+                #
+                #     # Save
+                #     if infer:
+                #         file_name_save = os.path.join(drive,path, annot_type + '_edgeweight_output.png')
+                #     else:
+                #         file_name_save = os.path.join(drive,path, annot_type + '_edgeweight.png')
+                #     masks.save(mask_dict,'edge_weighted',file_name_save)
+
+    def masks_to_annotation(self, outputs_dir, outputs=None):
+        # %% Process one folder and save as one json file allowing multiple annotation types
+        simplify_tol = 0  # Tolerance for polygon simplification with shapely (0 to not simplify)
+
+        if os.path.exists(outputs_dir):
+            print(f'Analyzing folder:{outputs_dir}')
+            features = []  # For geojson
+            image_size = None
+            for out in outputs:
+                file_full = os.path.join(outputs_dir, out.get("name") + "_output.png")
+                if os.path.exists(file_full):
+                    print("get output file path:", file_full)
+                    mask_img = io.imread(file_full)
+                    print("mask_img.shape:", mask_img.shape)
+                    mask = measure.label(mask_img)
+                    post_mask = DRFNStoolbox.seedless_segment(mask, 15, p_thresh=0.5)
+                    img = Image.fromarray(post_mask.astype('uint8'))
+                    img.save(os.path.join(outputs_dir, out.get("name") + '_noSeeds_OBJECTS.png'))
+                    if out.get("postProcessing").get("type") == "withseed":
+                        seed_mask_file = os.path.join(outputs_dir, out.get("postProcessing").get("seed") + "_output.png")
+                        if os.path.exists(seed_mask_file):
+                            print("get seed mask file :", seed_mask_file)
+                            seed_mask_img = io.imread(seed_mask_file)
+                            print("seed_mask_img.shape:", seed_mask_img.shape)
+                            seed_mask = measure.label(seed_mask_img)
+                            post_mask = DRFNStoolbox.segment_with_seed(seed_mask, post_mask, 15, p_thresh=0.5)
+                            img = Image.fromarray(post_mask.astype('uint8'))
+                            img.save(os.path.join(outputs_dir, out.get("name") + '_wSeeds_OBJECTS.png'))
+                        else:
+                            print("warming: seed mask file not exist:", seed_mask_file)
+
+                    # Here summarizing the geojson should occur
+                    image_size = mask_img.shape  # This might cause problems if any kind of binning was performed
+
+                    # Get label from file name
+                    label = out.get("name").split('_', 1)[0]
+                    print("label:", label)
+                    # print(mask_img[0:1, :100])
+
+                    # Call function to transform segmentation masks into (geojson) polygons
+                    feature, contours = segmentationUtils.masks_to_polygon(post_mask,
+                                                                           label=label,
+                                                                           simplify_tol=simplify_tol)
+                    # save_name=file_full.replace(".png", ".json"))
+                    features = features + feature
+                else:
+                    print("warming: output file not exist:", file_full)
+            feature_collection = FeatureCollection(features, bbox=[0, 0.0, image_size[0], image_size[1]])
+
+            # Save to json file
+            save_name_json = os.path.join(outputs_dir, 'prediction.json')
+            with open(save_name_json, 'w') as f:
+                dump(feature_collection, f)
+                f.close()
+            return feature_collection
 
 api.export(ImJoyPlugin())
 </script>
