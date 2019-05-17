@@ -83,7 +83,7 @@ Once done, the result will be saved automatically into the testing folder.
 {
   "name": "Anet-Lite",
   "type": "native-python",
-  "version": "0.3.7",
+  "version": "0.3.9",
   "api_version": "0.1.3",
   "description": "A generic plugin for image-to-image translation with A-net.",
   "tags": ["CPU", "GPU", "Windows-CPU", "Window-GPU"],
@@ -222,8 +222,7 @@ class UpdateUI(Callback):
         self.logs = logs
         api.showStatus('training epoch:' + str(self.epoch) + '/' + str(self.total_epoch) + ' ' + str(logs))
         sys.stdout.flush()
-        self.dash.updateCallback('onStep', self.step, {'mse': np.asscalar(logs['mean_squared_error']),
-                                                       'dssim_l1': np.asscalar(logs['DSSIM_L1'])})
+        self.dash.updateCallback('onStep', self.step, {'mse': np.asscalar(logs['mean_squared_error'])})
         self.step += 1
         if abort.is_set():
             raise Exception('Abort.')
@@ -242,7 +241,7 @@ class UpdateUI(Callback):
 
 
 class my_config():
-    def __init__(self, name="", epochs=100, batchsize=4, steps=10):
+    def __init__(self, name="", epochs=100, batchsize=16, steps=10):
         self.name = name
         self.epochs = epochs
         self.steps = steps
@@ -273,10 +272,10 @@ class ImJoyPlugin():
                     print("model_config:", model_config)
                     self.model.load_weights(model_path)
                 # self.model.load_weights(model_path)
-        DSSIM_L1 = get_dssim_l1_loss()
+        # DSSIM_L1 = get_dssim_l1_loss()
         self.model.compile(optimizer='adam',
-                           loss=DSSIM_L1,
-                           metrics=['mse', DSSIM_L1])
+                           loss='mse',
+                           metrics=['mse'])
         self._initialized = True
         # api.showStatus("A-net lite successfully initialized.")
 
@@ -371,7 +370,7 @@ class ImJoyPlugin():
         return annotation_json
 
     async def add_train_run(self, my):
-        sample_path = "datasets/example/test/z018"
+        sample_path = "datasets/anet_png/test/w11_bac_bora_4437_p23_"
         await self.add_training_data(sample_path, local_anno=True)
 
     async def train_2(self, config):
@@ -383,7 +382,7 @@ class ImJoyPlugin():
         sources = GenericTransformedImages(opt)
         epochs = config.epochs
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Anet-lite Training", w=20, h=15,
-                                           data={"display_mode": "all", 'metrics': ['mse', 'dssim_l1'],
+                                           data={"display_mode": "all", 'metrics': ['mse'],
                                                  'callbacks': ['onStep']})
         updateUI = UpdateUI(epochs, self.dash, make_generator(sources['valid'], batch_size=1), opt)
         # updateUI = []
@@ -789,6 +788,13 @@ class ImJoyPlugin():
             print("annot_types: ", annot_types)
 
             for annot_type in annot_types:
+                if infer:
+                    file_name_save = os.path.join(drive, path, annot_type + '_filled_output.png')
+                else:
+                    file_name_save = os.path.join(drive, path, annot_type + '_filled.png')
+                if os.path.exists(file_name_save):
+                    print("skip to generate mask:", file_name_save)
+                    continue
                 # print("annot_type: ", annot_type)
                 masks_to_create[annot_type] = masks_to_create_value
 
