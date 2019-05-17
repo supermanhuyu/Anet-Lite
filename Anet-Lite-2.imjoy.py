@@ -83,7 +83,7 @@ Once done, the result will be saved automatically into the testing folder.
 {
   "name": "Anet-Lite",
   "type": "native-python",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "api_version": "0.1.3",
   "description": "A generic plugin for image-to-image translation with A-net.",
   "tags": ["CPU", "GPU", "Windows-CPU", "Window-GPU"],
@@ -164,7 +164,7 @@ def plot_tensors(dash, tensor_list, label, titles):
             img_str = base64.b64encode(buffered.getvalue()).decode('ascii')
             imgurl = 'data:image/png;base64,' + img_str
             displays[titles[i][j]] = imgurl
-        dash.appendDisplay(label, displays)
+    dash.appendDisplay(label, displays)
 
 
 def freeze_session(session, keep_var_names=None, output_names=None, clear_devices=True):
